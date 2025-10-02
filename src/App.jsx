@@ -16,7 +16,7 @@ const App = () => {
   const [syncStatus, setSyncStatus] = useState('disconnected');
   const [showSetupModal, setShowSetupModal] = useState(false);
   
-  const [categories] = useState({
+  const categories = {
     expense: [
       { id: 1, name: 'Alimentação', icon: '🍔', color: 'bg-orange-500' },
       { id: 2, name: 'Transporte', icon: '🚗', color: 'bg-blue-500' },
@@ -27,31 +27,33 @@ const App = () => {
     investment: [
       { id: 4, name: 'Ações', icon: '📈', color: 'bg-purple-600' },
     ]
-  });
+  };
 
-  const [accounts] = useState([
+  const accounts = [
     { id: 1, name: 'Nubank', institution: 'Nubank S.A.', type: 'corrente', balance: 2034.00 },
-  ]);
+  ];
 
-  const [transactions] = useState([
+  const transactions = [
     { id: 1, type: 'expense', description: 'Supermercado', amount: 245.80, category: 'Alimentação', date: '2025-10-01' },
     { id: 2, type: 'income', description: 'Salário', amount: 5500.00, category: 'Salário', date: '2025-10-01' },
-  ]);
+  ];
 
   useEffect(() => {
+    const checkUser = async () => {
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+      setLoading(false);
+    };
+    
     checkUser();
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
+    
     return () => subscription.unsubscribe();
   }, []);
-
-  const checkUser = async () => {
-    const currentUser = await getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
-  };
 
   const handleLogout = async () => {
     await signOut();
@@ -70,24 +72,6 @@ const App = () => {
     }, 2000);
   };
 
-  const saveToDrive = () => {
-    if (!isConnected) return;
-    setSyncStatus('syncing');
-    setIsSyncing(true);
-    setTimeout(() => {
-      setSyncStatus('synced');
-      setIsSyncing(false);
-      setLastSync(new Date());
-    }, 1500);
-  };
-
-  useEffect(() => {
-    if (isConnected && user) {
-      const timer = setTimeout(() => saveToDrive(), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [categories, accounts, isConnected, user]);
-
   const balance = {
     income: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
     expenses: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
@@ -98,7 +82,7 @@ const App = () => {
     if (!lastSync) return 'Nunca';
     const diff = Math.floor((new Date() - lastSync) / 1000);
     if (diff < 60) return 'Agora mesmo';
-    if (diff < 3600) return `${Math.floor(diff / 60)} min atrás`;
+    if (diff < 3600) return Math.floor(diff / 60) + ' min atrás';
     return lastSync.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -145,9 +129,7 @@ const App = () => {
               {syncStatus === 'disconnected' && <CloudOff className="w-5 h-5 text-gray-300" />}
               <div className="text-left">
                 <p className="text-xs font-medium">
-                  {syncStatus === 'synced' && 'Sincronizado'}
-                  {syncStatus === 'syncing' && 'Sincronizando...'}
-                  {syncStatus === 'disconnected' && 'Desconectado'}
+                  {syncStatus === 'synced' ? 'Sincronizado' : syncStatus === 'syncing' ? 'Sincronizando...' : 'Desconectado'}
                 </p>
                 <p className="text-xs opacity-75">{formatLastSync()}</p>
               </div>
@@ -220,9 +202,7 @@ const App = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ${
-                activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'
-              }`}
+              className={'flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap ' + (activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-white text-gray-700')}
             >
               <tab.icon className="w-4 h-4" />
               <span className="hidden sm:inline">{tab.label}</span>
@@ -240,7 +220,7 @@ const App = () => {
                     <p className="font-medium">{t.description}</p>
                     <p className="text-sm text-gray-500">{t.category} • {t.date}</p>
                   </div>
-                  <p className={`font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                  <p className={'font-bold ' + (t.type === 'income' ? 'text-green-600' : 'text-red-600')}>
                     {t.type === 'income' ? '+' : '-'} R$ {t.amount.toFixed(2)}
                   </p>
                 </div>
