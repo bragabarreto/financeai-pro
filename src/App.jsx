@@ -501,7 +501,8 @@ const App = () => {
     accounts={accounts}
     user={user}
   />
-)}                        </button>
+)}                    
+                     
                         <button
                           onClick={() => handleDeleteCategory(category.id)}
                           className="p-1 hover:bg-red-100 rounded"
@@ -552,7 +553,7 @@ const App = () => {
                         {category.icon}
                       </div>
                       <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
-                        <button
+                        <button>
                           onClick={() => {
                             setEditingCategory(category);
                             setCategoryType('investment');
@@ -714,4 +715,5 @@ const App = () => {
 };
 
 export default App;
+
 
