@@ -33,6 +33,7 @@ const App = () => {
   });
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [cards, setCards] = useState([]);
   
   // Estados de Modais
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -76,7 +77,8 @@ const App = () => {
       loadCategories(),
       loadAccounts(),
       loadTransactions()
-    ]);
+      loadCards()
+      ]);
   };
 
   // Funções de Autenticação
@@ -115,6 +117,7 @@ const App = () => {
     setCategories({ expense: [], income: [], investment: [] });
     setAccounts([]);
     setTransactions([]);
+    setCards([]);
     setActiveTab('dashboard');
     showToast('Logout realizado com sucesso!', 'success');
   };
@@ -295,7 +298,7 @@ const App = () => {
 
       await Promise.all([
         loadTransactions(),
-        loadAccounts() // Recarregar contas para atualizar saldos
+        loadAccounts() // Recarregar contas para atualizar saldos       
       ]);
       
       setShowTransactionModal(false);
@@ -304,6 +307,22 @@ const App = () => {
       showToast('Erro ao salvar transação', 'error');
     }
   };
+
+  // Função para carregar cartões de crédito
+const loadCards = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name');
+
+    if (error) throw error;
+    setCards(data || []);
+  } catch (error) {
+    console.error('Erro ao carregar cartões:', error);
+  }
+};
 
   const handleDeleteTransaction = async (id) => {
     if (!window.confirm('Deseja realmente excluir esta transação?')) return;
@@ -505,6 +524,7 @@ const App = () => {
             transactions={transactions}
             categories={categories}
             accounts={accounts}
+            cards={cards}
             user={user}
           />
         )}
@@ -702,7 +722,11 @@ const App = () => {
 
         {/* Credit Cards Tab */}
         {activeTab === 'cards' && (
-          <CreditCardManager user={user} />
+          <CreditCardManager 
+            user={user} 
+            cards={cards}
+            loadCards={loadCards}
+            />
         )}
 
         {/* Goals Tab */}
@@ -851,4 +875,5 @@ const App = () => {
 
 export default App;
         
+
 
