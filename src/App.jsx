@@ -76,7 +76,7 @@ const App = () => {
     await Promise.all([
       loadCategories(),
       loadAccounts(),
-      loadTransactions()
+      loadTransactions(),
       loadCards()
       ]);
   };
@@ -875,5 +875,6 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
