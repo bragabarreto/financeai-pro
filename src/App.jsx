@@ -3,13 +3,17 @@ import { supabase } from './supabaseClient';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, 
   Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings,
-  LogOut, User, Trash2, Edit, X, Check, Home, ArrowUpRight, ArrowDownRight
+  LogOut, User, Trash2, Edit, X, Check, Home, ArrowUpRight, ArrowDownRight,
+  FileText
 } from 'lucide-react';
 import CategoryModal from './components/Modals/CategoryModal';
 import AccountModal from './components/Modals/AccountModal';
 import TransactionModal from './components/Modals/TransactionModal';
 import Dashboard from './components/Dashboard/Dashboard';
 import CreditCardManager from './components/CreditCards/CreditCardManager';
+import GoalsManager from './components/Goals/GoalsManager';
+import ReportsGenerator from './components/Reports/ReportsGenerator';
+
 const App = () => {
   // Estados de Autenticação
   const [user, setUser] = useState(null);
@@ -355,8 +359,7 @@ const App = () => {
   };
 
   const totals = calculateTotals();
-
-  // Tela de Loading
+ // Tela de Loading
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
@@ -424,7 +427,6 @@ const App = () => {
       </div>
     );
   }
-
   // Tela Principal do App
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
@@ -469,9 +471,11 @@ const App = () => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'expenses', label: 'Gastos', icon: TrendingDown },
-              { id: 'cards', label: 'Cartões', icon: CreditCard },
               { id: 'income', label: 'Receitas', icon: TrendingUp },
               { id: 'investments', label: 'Investimentos', icon: BarChart3 },
+              { id: 'cards', label: 'Cartões', icon: CreditCard },
+              { id: 'goals', label: 'Metas', icon: Target },
+              { id: 'reports', label: 'Relatórios', icon: FileText },
               { id: 'settings', label: 'Configurações', icon: Settings }
             ].map(tab => (
               <button
@@ -492,17 +496,118 @@ const App = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">{/* Continue na parte 4 */}
         {/* Dashboard */}
         {activeTab === 'dashboard' && (
-  <Dashboard 
-    transactions={transactions}
-    categories={categories}
-    accounts={accounts}
-    user={user}
-  />
-)}                    
-                     
+          <Dashboard 
+            transactions={transactions}
+            categories={categories}
+            accounts={accounts}
+            user={user}
+          />
+        )}
+
+        {/* Expenses Tab */}
+        {activeTab === 'expenses' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Categorias de Gastos</h2>
+              <button
+                onClick={() => {
+                  setCategoryType('expense');
+                  setEditingCategory(null);
+                  setShowCategoryModal(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Nova Categoria</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {categories.expense.map(category => {
+                const categoryTotal = transactions
+                  .filter(t => t.category === category.id && t.type === 'expense')
+                  .reduce((acc, t) => acc + t.amount, 0);
+                
+                return (
+                  <div key={category.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition group">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`w-12 h-12 rounded-full ${category.color} flex items-center justify-center text-white text-2xl`}>
+                        {category.icon}
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
+                        <button
+                          onClick={() => {
+                            setEditingCategory(category);
+                            setCategoryType('expense');
+                            setShowCategoryModal(true);
+                          }}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <Edit className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(category.id)}
+                          className="p-1 hover:bg-red-100 rounded"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+                    <h3 className="font-bold text-lg">{category.name}</h3>
+                    <p className="text-2xl font-bold text-red-600 mt-2">
+                      R$ {categoryTotal.toFixed(2)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Income Tab */}
+        {activeTab === 'income' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Categorias de Receitas</h2>
+              <button
+                onClick={() => {
+                  setCategoryType('income');
+                  setEditingCategory(null);
+                  setShowCategoryModal(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Nova Categoria</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {categories.income.map(category => {
+                const categoryTotal = transactions
+                  .filter(t => t.category === category.id && t.type === 'income')
+                  .reduce((acc, t) => acc + t.amount, 0);
+                
+                return (
+                  <div key={category.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition group">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`w-12 h-12 rounded-full ${category.color} flex items-center justify-center text-white text-2xl`}>
+                        {category.icon}
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
+                        <button
+                          onClick={() => {
+                            setEditingCategory(category);
+                            setCategoryType('income');
+                            setShowCategoryModal(true);
+                          }}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <Edit className="w-4 h-4 text-gray-600" />
+                        </button>
                         <button
                           onClick={() => handleDeleteCategory(category.id)}
                           className="p-1 hover:bg-red-100 rounded"
@@ -553,7 +658,7 @@ const App = () => {
                         {category.icon}
                       </div>
                       <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
-                        <button>
+                        <button
                           onClick={() => {
                             setEditingCategory(category);
                             setCategoryType('investment');
@@ -585,8 +690,27 @@ const App = () => {
 
         {/* Credit Cards Tab */}
         {activeTab === 'cards' && (
-        <CreditCardManager user={user} />
-)}
+          <CreditCardManager user={user} />
+        )}
+
+        {/* Goals Tab */}
+        {activeTab === 'goals' && (
+          <GoalsManager 
+            user={user}
+            transactions={transactions}
+            categories={categories}
+          />
+        )}
+
+        {/* Reports Tab */}
+        {activeTab === 'reports' && (
+          <ReportsGenerator 
+            user={user}
+            transactions={transactions}
+            categories={categories}
+            accounts={accounts}
+          />
+        )}
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
@@ -675,8 +799,7 @@ const App = () => {
             </div>
           </div>
         )}
-      </div>
-
+      </div>{/* Continue na parte 5 */}
       {/* Modals */}
       <CategoryModal
         show={showCategoryModal}
@@ -715,5 +838,4 @@ const App = () => {
 };
 
 export default App;
-
-
+        
