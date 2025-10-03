@@ -8,7 +8,8 @@ import {
 import CategoryModal from './components/Modals/CategoryModal';
 import AccountModal from './components/Modals/AccountModal';
 import TransactionModal from './components/Modals/TransactionModal';
-
+import Dashboard from './components/Dashboard/Dashboard';
+import CreditCardManager from './components/CreditCards/CreditCardManager';
 const App = () => {
   // Estados de Autenticação
   const [user, setUser] = useState(null);
@@ -468,6 +469,7 @@ const App = () => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'expenses', label: 'Gastos', icon: TrendingDown },
+              { id: 'cards', label: 'Cartões', icon: CreditCard },
               { id: 'income', label: 'Receitas', icon: TrendingUp },
               { id: 'investments', label: 'Investimentos', icon: BarChart3 },
               { id: 'settings', label: 'Configurações', icon: Settings }
@@ -493,257 +495,13 @@ const App = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Dashboard */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Saldo Total</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      R$ {totals.balance.toFixed(2)}
-                    </p>
-                  </div>
-                  <Wallet className="w-10 h-10 text-blue-600" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Gastos do Mês</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      R$ {totals.expenses.toFixed(2)}
-                    </p>
-                  </div>
-                  <TrendingDown className="w-10 h-10 text-red-600" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Receitas do Mês</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      R$ {totals.income.toFixed(2)}
-                    </p>
-                  </div>
-                  <TrendingUp className="w-10 h-10 text-green-600" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">Investimentos</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      R$ {totals.investments.toFixed(2)}
-                    </p>
-                  </div>
-                  <BarChart3 className="w-10 h-10 text-purple-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-lg font-bold mb-4">Ações Rápidas</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => {
-                    setCategoryType('expense');
-                    setEditingTransaction(null);
-                    setShowTransactionModal(true);
-                  }}
-                  className="flex items-center justify-center space-x-2 p-4 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
-                >
-                  <ArrowDownRight className="w-5 h-5" />
-                  <span>Adicionar Gasto</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setCategoryType('income');
-                    setEditingTransaction(null);
-                    setShowTransactionModal(true);
-                  }}
-                  className="flex items-center justify-center space-x-2 p-4 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition"
-                >
-                  <ArrowUpRight className="w-5 h-5" />
-                  <span>Adicionar Receita</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setCategoryType('investment');
-                    setEditingTransaction(null);
-                    setShowTransactionModal(true);
-                  }}
-                  className="flex items-center justify-center space-x-2 p-4 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition"
-                >
-                  <BarChart3 className="w-5 h-5" />
-                  <span>Adicionar Investimento</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Transactions */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-lg font-bold mb-4">Transações Recentes</h2>
-              <div className="space-y-3">
-                {transactions.slice(0, 5).map(transaction => {
-                  const category = [...categories.expense, ...categories.income, ...categories.investment]
-                    .find(c => c.id === transaction.category);
-                  const account = accounts.find(a => a.id === transaction.account_id);
-                  
-                  return (
-                    <div key={transaction.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg group">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-full ${category?.color || 'bg-gray-500'} flex items-center justify-center text-white`}>
-                          <span>{category?.icon || '💰'}</span>
-                        </div>
-                        <div>
-                          <p className="font-medium">{transaction.description}</p>
-                          <p className="text-sm text-gray-600">
-                            {category?.name} • {account?.name} • {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`font-bold ${
-                          transaction.type === 'expense' ? 'text-red-600' : 
-                          transaction.type === 'income' ? 'text-green-600' : 
-                          'text-purple-600'
-                        }`}>
-                          {transaction.type === 'expense' ? '-' : '+'} R$ {transaction.amount.toFixed(2)}
-                        </span>
-                        <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
-                          <button
-                            onClick={() => {
-                              setEditingTransaction(transaction);
-                              setShowTransactionModal(true);
-                            }}
-                            className="p-1 hover:bg-gray-200 rounded"
-                          >
-                            <Edit className="w-4 h-4 text-gray-600" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTransaction(transaction.id)}
-                            className="p-1 hover:bg-red-100 rounded"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Expenses Tab */}
-        {activeTab === 'expenses' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Categorias de Gastos</h2>
-              <button
-                onClick={() => {
-                  setCategoryType('expense');
-                  setEditingCategory(null);
-                  setShowCategoryModal(true);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Nova Categoria</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {categories.expense.map(category => {
-                const categoryTotal = transactions
-                  .filter(t => t.category === category.id && t.type === 'expense')
-                  .reduce((acc, t) => acc + t.amount, 0);
-                
-                return (
-                  <div key={category.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition group">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-full ${category.color} flex items-center justify-center text-white text-2xl`}>
-                        {category.icon}
-                      </div>
-                      <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
-                        <button
-                          onClick={() => {
-                            setEditingCategory(category);
-                            setCategoryType('expense');
-                            setShowCategoryModal(true);
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          <Edit className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(category.id)}
-                          className="p-1 hover:bg-red-100 rounded"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      </div>
-                    </div>
-                    <h3 className="font-bold text-lg">{category.name}</h3>
-                    <p className="text-2xl font-bold text-red-600 mt-2">
-                      R$ {categoryTotal.toFixed(2)}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Income Tab */}
-        {activeTab === 'income' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Categorias de Receitas</h2>
-              <button
-                onClick={() => {
-                  setCategoryType('income');
-                  setEditingCategory(null);
-                  setShowCategoryModal(true);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Nova Categoria</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {categories.income.map(category => {
-                const categoryTotal = transactions
-                  .filter(t => t.category === category.id && t.type === 'income')
-                  .reduce((acc, t) => acc + t.amount, 0);
-                
-                return (
-                  <div key={category.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition group">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-full ${category.color} flex items-center justify-center text-white text-2xl`}>
-                        {category.icon}
-                      </div>
-                      <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
-                        <button
-                          onClick={() => {
-                            setEditingCategory(category);
-                            setCategoryType('income');
-                            setShowCategoryModal(true);
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          <Edit className="w-4 h-4 text-gray-600" />
-                        </button>
+  <Dashboard 
+    transactions={transactions}
+    categories={categories}
+    accounts={accounts}
+    user={user}
+  />
+)}                        </button>
                         <button
                           onClick={() => handleDeleteCategory(category.id)}
                           className="p-1 hover:bg-red-100 rounded"
@@ -823,6 +581,11 @@ const App = () => {
             </div>
           </div>
         )}
+
+        {/* Credit Cards Tab */}
+        {activeTab === 'cards' && (
+        <CreditCardManager user={user} />
+)}
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
@@ -951,3 +714,4 @@ const App = () => {
 };
 
 export default App;
+
