@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, 
-  Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings,
+  Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings, RefreshCw,
   LogOut, User, Trash2, Edit, X, Check, Home, ArrowUpRight, ArrowDownRight,
   FileText
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import Dashboard from './components/Dashboard/Dashboard';
 import CreditCardManager from './components/CreditCards/CreditCardManager';
 import GoalsManager from './components/Goals/GoalsManager';
 import ReportsGenerator from './components/Reports/ReportsGenerator';
+import RecurringExpenseManager from './components/RecurringExpenses/RecurringExpenseManager';
 
 const App = () => {
   // Estados de Autenticação
@@ -471,6 +472,7 @@ const App = () => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'expenses', label: 'Gastos', icon: TrendingDown },
+              { id: 'recurring', label: 'Recorrentes', icon: RefreshCw },
               { id: 'income', label: 'Receitas', icon: TrendingUp },
               { id: 'investments', label: 'Investimentos', icon: BarChart3 },
               { id: 'cards', label: 'Cartões', icon: CreditCard },
@@ -566,6 +568,16 @@ const App = () => {
             </div>
           </div>
         )}
+
+        {/* Recurring Expenses Tab */}
+        {activeTab === 'recurring' && (
+          <RecurringExpenseManager 
+          user={user}
+          categories={categories}
+          accounts={accounts}
+          cards={cards} // Se você tiver cartões carregados
+  />
+)}
 
         {/* Income Tab */}
         {activeTab === 'income' && (
@@ -839,3 +851,4 @@ const App = () => {
 
 export default App;
         
+
