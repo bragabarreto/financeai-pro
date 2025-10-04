@@ -210,7 +210,11 @@ const App = () => {
 
 const handleSaveAccount = async (accountData) => {
   try {
-    // Preparar dados sem incluir o 'id'
+    console.log('=== INÍCIO SAVE ACCOUNT ===');
+    console.log('Account data recebido:', accountData);
+    console.log('User ID:', user.id);
+    
+    // Preparar dados
     const dataToSave = {
       name: accountData.name,
       type: accountData.type,
@@ -219,32 +223,44 @@ const handleSaveAccount = async (accountData) => {
       is_primary: accountData.is_primary || false,
       user_id: user.id
     };
+    
+    console.log('Data to save:', dataToSave);
 
     if (accountData.id) {
-      // Atualização - aqui pode incluir o id
-      const { error } = await supabase
+      console.log('MODO: Atualização');
+      const { data, error } = await supabase
         .from('accounts')
         .update(dataToSave)
         .eq('id', accountData.id)
-        .eq('user_id', user.id); // Segurança adicional
+        .eq('user_id', user.id)
+        .select(); // Adicione .select() para ver o retorno
         
+      console.log('Resposta UPDATE:', { data, error });
+      
       if (error) throw error;
       showToast('Conta atualizada!', 'success');
     } else {
-      // Criação - NÃO incluir o id
-      const { error } = await supabase
+      console.log('MODO: Criação nova conta');
+      const { data, error } = await supabase
         .from('accounts')
-        .insert([dataToSave]); // dataToSave não tem campo 'id'
+        .insert([dataToSave])
+        .select(); // Adicione .select() para ver o retorno
         
+      console.log('Resposta INSERT:', { data, error });
+      
       if (error) throw error;
       showToast('Conta criada!', 'success');
     }
 
+    console.log('Recarregando contas...');
     await loadAccounts();
+    
     setShowAccountModal(false);
     setEditingAccount(null);
+    
   } catch (error) {
-    console.error('Erro ao salvar conta:', error);
+    console.error('=== ERRO COMPLETO ===');
+    console.error('Error object:', error);
     showToast(`Erro ao salvar conta: ${error.message}`, 'error');
   }
 };
@@ -886,6 +902,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
