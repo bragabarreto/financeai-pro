@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   RefreshCw, Plus, Edit, Trash2, Calendar, DollarSign, 
   AlertCircle, Check, X, Clock, CreditCard, Bell, 
-  ChevronRight, PauseCircle, PlayCircle, Info
+  ChevronRight, PauseCircle, PlayCircle, Info, Users
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
@@ -33,7 +33,8 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
     start_date: format(new Date(), 'yyyy-MM-dd'),
     end_date: '',
     notification_days: '1',
-    auto_approve: false
+    auto_approve: false,
+    is_alimony: false
   });
 
   // Estado para aprovação
@@ -674,6 +675,28 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
                 </div>
               )}
 
+              {/* Campo de Pensão Alimentícia */}
+                <div className="p-4 bg-purple-50 rounded-lg">
+                <div className="flex items-center">
+                <input
+                type="checkbox"
+                id="is_alimony_recurring"
+                checked={formData.is_alimony}
+                onChange={(e) => setFormData({...formData, is_alimony: e.target.checked})}
+                className="mr-3 w-4 h-4 text-purple-600 focus:ring-purple-500"
+    />
+                <label htmlFor="is_alimony_recurring" className="flex items-center cursor-pointer">
+                <Users className="w-4 h-4 mr-2 text-purple-600" />
+                <span className="text-sm font-medium">Marcar como Pensão Alimentícia</span>
+                </label>
+                </div>
+                {formData.is_alimony && (
+                <p className="text-xs text-purple-600 mt-2 ml-7">
+                Esta despesa recorrente será contabilizada nos relatórios de pensão alimentícia
+                </p>
+  )}
+                </div>
+
               {/* Período */}
               <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center">
@@ -843,5 +866,6 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
     </div>
   );
 };
+
 
 export default RecurringExpenseManager;
