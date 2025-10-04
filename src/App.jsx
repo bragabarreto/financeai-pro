@@ -194,20 +194,25 @@ const App = () => {
 
   // Funções de Contas
   const loadAccounts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
+  try {
+    console.log('Loading accounts for user:', user.id);
+    
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name');
 
-      if (error) throw error;
-      setAccounts(data || []);
-    } catch (error) {
-      showToast('Erro ao carregar contas', 'error');
-    }
-  };
-
+    console.log('Accounts loaded:', { data, error });
+    
+    if (error) throw error;
+    setAccounts(data || []);
+  } catch (error) {
+    console.error('Erro ao carregar contas:', error);
+    showToast('Erro ao carregar contas', 'error');
+  }
+};
+  
 const handleSaveAccount = async (accountData) => {
   try {
     console.log('=== INÍCIO SAVE ACCOUNT ===');
@@ -902,6 +907,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
