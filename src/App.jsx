@@ -208,37 +208,46 @@ const App = () => {
     }
   };
 
-  const handleSaveAccount = async (accountData) => {
-    try {
-      const dataToSave = {
-        ...accountData,
-        user_id: user.id,
-        balance: parseFloat(accountData.balance) || 0,
-        is_primary: accountData.is_primary || false
-      };
+const handleSaveAccount = async (accountData) => {
+  try {
+    // Preparar dados sem incluir o 'id'
+    const dataToSave = {
+      name: accountData.name,
+      type: accountData.type,
+      balance: parseFloat(accountData.balance) || 0,
+      color: accountData.color || 'bg-blue-500',
+      is_primary: accountData.is_primary || false,
+      user_id: user.id
+    };
 
-      if (accountData.id) {
-        const { error } = await supabase
-          .from('accounts')
-          .update(dataToSave)
-          .eq('id', accountData.id);
-        if (error) throw error;
-        showToast('Conta atualizada!', 'success');
-      } else {
-        const { error } = await supabase
-          .from('accounts')
-          .insert([dataToSave]);
-        if (error) throw error;
-        showToast('Conta criada!', 'success');
-      }
-
-      await loadAccounts();
-      setShowAccountModal(false);
-      setEditingAccount(null);
-    } catch (error) {
-      showToast('Erro ao salvar conta', 'error');
+    if (accountData.id) {
+      // Atualização - aqui pode incluir o id
+      const { error } = await supabase
+        .from('accounts')
+        .update(dataToSave)
+        .eq('id', accountData.id)
+        .eq('user_id', user.id); // Segurança adicional
+        
+      if (error) throw error;
+      showToast('Conta atualizada!', 'success');
+    } else {
+      // Criação - NÃO incluir o id
+      const { error } = await supabase
+        .from('accounts')
+        .insert([dataToSave]); // dataToSave não tem campo 'id'
+        
+      if (error) throw error;
+      showToast('Conta criada!', 'success');
     }
-  };
+
+    await loadAccounts();
+    setShowAccountModal(false);
+    setEditingAccount(null);
+  } catch (error) {
+    console.error('Erro ao salvar conta:', error);
+    showToast(`Erro ao salvar conta: ${error.message}`, 'error');
+  }
+};
 
   const handleDeleteAccount = async (id) => {
     if (!window.confirm('Deseja realmente excluir esta conta?')) return;
@@ -877,6 +886,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
