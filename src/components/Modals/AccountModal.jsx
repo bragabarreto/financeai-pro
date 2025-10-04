@@ -37,9 +37,6 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
   const handleSubmit = async (e) => {
   e.preventDefault();
   
-  console.log('AccountModal - Form Data:', formData);
-  console.log('AccountModal - Has ID?', !!formData.id);
-  
   if (!formData.name.trim()) {
     setError('Nome é obrigatório');
     return;
@@ -49,26 +46,27 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
   setError('');
 
   try {
-    // Certifique-se de NÃO passar ID vazio
+    // Prepare os dados SEM o ID para criação
     const dataToSave = {
       name: formData.name,
       type: formData.type,
-      balance: formData.balance,
-      color: formData.color,
+      balance: parseFloat(formData.balance) || 0,
+      color: formData.color || 'bg-blue-500',
       is_primary: formData.is_primary || false
     };
     
-    // Só adicione o ID se ele realmente existir
-    if (formData.id && formData.id !== '') {
-      dataToSave.id = formData.id;
+    // Só adicione ID se for edição E o ID existir
+    if (account && account.id) {
+      dataToSave.id = account.id;
     }
     
-    console.log('AccountModal - Sending to save:', dataToSave);
+    console.log('Modal enviando:', dataToSave);
+    console.log('É edição?', !!(account && account.id));
     
     await onSave(dataToSave);
     onClose();
   } catch (err) {
-    console.error('Erro no modal:', err);
+    console.error('Erro:', err);
     setError(err.message || 'Erro ao salvar conta');
   } finally {
     setLoading(false);
@@ -192,4 +190,5 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
 };
 
 export default AccountModal;
+
 
