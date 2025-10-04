@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AlimonyWidget from './AlimonyWidget';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -195,6 +196,9 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
         </div>
       </div>
 
+      {/* Após os cards de resumo, adicione: */}
+      <AlimonyWidget user={user} transactions={transactions} />
+      
       {/* Metas */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h2 className="text-lg font-bold mb-4 flex items-center">
@@ -349,5 +353,6 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
     </div>
   );
 };
+
 
 export default Dashboard;
