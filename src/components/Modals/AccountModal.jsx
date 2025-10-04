@@ -30,7 +30,7 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
     // Editando conta existente
     setFormData({
       name: account.name || '',
-      type: account.type || 'checking',
+      type: account.type || 'corrente',
       balance: account.balance || 0,
       color: account.color || 'bg-blue-500',
       is_primary: account.is_primary || false
@@ -39,7 +39,7 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
     // Nova conta - NÃO incluir ID
     setFormData({
       name: '',
-      type: 'checking',
+      type: 'corrente',
       balance: 0,
       color: 'bg-blue-500',
       is_primary: false
@@ -120,13 +120,15 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
           <div>
             <label className="block text-sm font-medium mb-1">Tipo de Conta</label>
             <select
-              value={formData.type}
-              onChange={(e) => setFormData({...formData, type: e.target.value})}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {accountTypes.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+>
+            <option value="corrente">Conta Corrente</option>
+            <option value="poupança">Poupança</option>
+            <option value="investimento">Investimento</option>
+            <option value="cartao_credito">Cartão de Crédito</option>
+            <option value="outro">Outros</option>
             </select>
           </div>
 
@@ -202,6 +204,7 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
 };
 
 export default AccountModal;
+
 
 
 
