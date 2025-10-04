@@ -229,6 +229,7 @@ const handleSaveAccount = async (accountData) => {
       balance: parseFloat(accountData.balance) || 0,
       color: accountData.color || 'bg-blue-500',
       is_primary: accountData.is_primary || false,
+      institution: accountData.institution || '',
       user_id: user.id
     };
 
@@ -907,6 +908,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
