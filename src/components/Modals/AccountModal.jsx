@@ -1,33 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, Star } from 'lucide-react';
 
 const AccountModal = ({ show, onClose, onSave, account }) => {
   const [formData, setFormData] = useState({
     name: '',
-    institution: '',
-    type: 'corrente',
+    type: 'checking',
     balance: 0,
-    investment_type: '',
-    specific_type: '',
-    crypto_type: '',
-    created_date: new Date().toISOString().split('T')[0]
+    color: 'bg-blue-500',
+    is_primary: false // NOVO CAMPO
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const investmentTypes = ['ações', 'fundos de investimentos', 'CDB', 'LCI', 'LCA', 'criptomoedas', 'outros'];
-  const cryptoTypes = ['Bitcoin (BTC)', 'Ethereum (ETH)', 'Cardano (ADA)', 'Solana (SOL)', 'Outros'];
+  const accountTypes = [
+    { value: 'checking', label: 'Conta Corrente' },
+    { value: 'savings', label: 'Poupança' },
+    { value: 'investment', label: 'Conta Investimento' },
+    { value: 'cash', label: 'Dinheiro' },
+    { value: 'other', label: 'Outro' }
+  ];
+
+  const colors = [
+    'bg-blue-500', 'bg-green-500', 'bg-purple-500', 
+    'bg-red-500', 'bg-yellow-500', 'bg-gray-500'
+  ];
 
   useEffect(() => {
     if (account) {
-      setFormData(account);
+      setFormData({
+        ...account,
+        is_primary: account.is_primary || false
+      });
     }
   }, [account]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.institution.trim()) {
-      setError('Nome e instituição são obrigatórios');
+    if (!formData.name.trim()) {
+      setError('Nome é obrigatório');
       return;
     }
 
@@ -51,136 +61,110 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
       <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">
-            {account ? 'Editar' : 'Nova'} Conta
+            {account ? 'Editar Conta' : 'Nova Conta'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X className="w-6 h-6" />
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Nome da Conta</label>
+            <label className="block text-sm font-medium mb-1">Nome da Conta *</label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-2 border rounded-lg"
-              placeholder="Ex: Nubank Principal"
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Instituição Financeira</label>
-            <input
-              type="text"
-              value={formData.institution}
-              onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-              className="w-full p-2 border rounded-lg"
-              placeholder="Ex: Nubank S.A."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Tipo de Conta</label>
+            <label className="block text-sm font-medium mb-1">Tipo de Conta</label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="w-full p-2 border rounded-lg"
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="corrente">Conta Corrente</option>
-              <option value="poupança">Conta Poupança</option>
-              <option value="investimentos">Conta Investimentos</option>
+              {accountTypes.map(type => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
             </select>
           </div>
 
-          {formData.type === 'investimentos' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium mb-2">Tipo de Investimento</label>
-                <select
-                  value={formData.investment_type || ''}
-                  onChange={(e) => setFormData({ ...formData, investment_type: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                >
-                  <option value="">Selecione...</option>
-                  {investmentTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-
-              {formData.investment_type === 'criptomoedas' && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">Tipo de Criptomoeda</label>
-                  <select
-                    value={formData.crypto_type || ''}
-                    onChange={(e) => setFormData({ ...formData, crypto_type: e.target.value })}
-                    className="w-full p-2 border rounded-lg"
-                  >
-                    <option value="">Selecione...</option>
-                    {cryptoTypes.map(crypto => (
-                      <option key={crypto} value={crypto}>{crypto}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {formData.investment_type && formData.investment_type !== 'criptomoedas' && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">Especificação</label>
-                  <input
-                    type="text"
-                    value={formData.specific_type || ''}
-                    onChange={(e) => setFormData({ ...formData, specific_type: e.target.value })}
-                    className="w-full p-2 border rounded-lg"
-                    placeholder="Ex: ITUB4, Tesouro Selic 2027"
-                  />
-                </div>
-              )}
-            </>
-          )}
-
           <div>
-            <label className="block text-sm font-medium mb-2">Saldo Inicial</label>
+            <label className="block text-sm font-medium mb-1">Saldo Inicial</label>
             <input
               type="number"
-              step="0.01"
               value={formData.balance}
-              onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
-              className="w-full p-2 border rounded-lg"
-              placeholder="0.00"
+              onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})}
+              step="0.01"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Data de Criação</label>
-            <input
-              type="date"
-              value={formData.created_date}
-              onChange={(e) => setFormData({ ...formData, created_date: e.target.value })}
-              className="w-full p-2 border rounded-lg"
-            />
+            <label className="block text-sm font-medium mb-1">Cor</label>
+            <div className="grid grid-cols-6 gap-2">
+              {colors.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setFormData({...formData, color})}
+                  className={`h-8 rounded ${color} ${
+                    formData.color === color ? 'ring-2 ring-offset-2 ring-blue-500' : ''
+                  }`}
+                />
+              ))}
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-300"
-          >
-            {loading ? 'Salvando...' : account ? 'Salvar Alterações' : 'Criar Conta'}
-          </button>
+          {/* Campo de Conta Principal */}
+          <div className="p-4 bg-yellow-50 rounded-lg">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="is_primary"
+                checked={formData.is_primary}
+                onChange={(e) => setFormData({...formData, is_primary: e.target.checked})}
+                className="mr-3 w-4 h-4 text-yellow-600 focus:ring-yellow-500"
+              />
+              <label htmlFor="is_primary" className="flex items-center cursor-pointer">
+                <Star className="w-4 h-4 mr-2 text-yellow-600" />
+                <span className="text-sm font-medium">Definir como Conta Principal (Salário)</span>
+              </label>
+            </div>
+            {formData.is_primary && (
+              <p className="text-xs text-yellow-700 mt-2 ml-7">
+                Esta será a conta padrão para recebimentos e pagamentos
+              </p>
+            )}
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Salvando...' : account ? 'Salvar Alterações' : 'Criar Conta'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300"
+            >
+              Cancelar
+            </button>
+          </div>
         </form>
       </div>
     </div>
