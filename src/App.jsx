@@ -215,11 +215,14 @@ const App = () => {
   
 const handleSaveAccount = async (accountData) => {
   try {
-    console.log('=== INÍCIO SAVE ACCOUNT ===');
-    console.log('Account data recebido:', accountData);
-    console.log('User ID:', user.id);
+    console.log('Recebido do modal:', accountData);
     
-    // Preparar dados
+    // Verificação explícita do ID
+    const isUpdate = accountData.id && accountData.id !== '';
+    
+    console.log('É atualização?', isUpdate);
+    
+    // Preparar dados SEM o ID
     const dataToSave = {
       name: accountData.name,
       type: accountData.type,
@@ -228,48 +231,45 @@ const handleSaveAccount = async (accountData) => {
       is_primary: accountData.is_primary || false,
       user_id: user.id
     };
-    
-    console.log('Data to save:', dataToSave);
 
-    if (accountData.id) {
-      console.log('MODO: Atualização');
+    if (isUpdate) {
+      console.log('Executando UPDATE para ID:', accountData.id);
+      
       const { data, error } = await supabase
         .from('accounts')
         .update(dataToSave)
         .eq('id', accountData.id)
         .eq('user_id', user.id)
-        .select(); // Adicione .select() para ver o retorno
+        .select();
         
-      console.log('Resposta UPDATE:', { data, error });
+      console.log('Resultado UPDATE:', { data, error });
       
       if (error) throw error;
       showToast('Conta atualizada!', 'success');
     } else {
-      console.log('MODO: Criação nova conta');
+      console.log('Executando INSERT - Nova conta');
+      console.log('Dados para inserir:', dataToSave);
+      
       const { data, error } = await supabase
         .from('accounts')
         .insert([dataToSave])
-        .select(); // Adicione .select() para ver o retorno
+        .select();
         
-      console.log('Resposta INSERT:', { data, error });
+      console.log('Resultado INSERT:', { data, error });
       
       if (error) throw error;
-      showToast('Conta criada!', 'success');
+      showToast('Conta criada com sucesso!', 'success');
     }
 
-    console.log('Recarregando contas...');
     await loadAccounts();
-    
     setShowAccountModal(false);
     setEditingAccount(null);
     
   } catch (error) {
-    console.error('=== ERRO COMPLETO ===');
-    console.error('Error object:', error);
-    showToast(`Erro ao salvar conta: ${error.message}`, 'error');
+    console.error('Erro ao salvar:', error);
+    showToast(`Erro: ${error.message}`, 'error');
   }
 };
-
   const handleDeleteAccount = async (id) => {
     if (!window.confirm('Deseja realmente excluir esta conta?')) return;
     
@@ -907,6 +907,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
