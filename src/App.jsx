@@ -213,7 +213,8 @@ const App = () => {
       const dataToSave = {
         ...accountData,
         user_id: user.id,
-        balance: parseFloat(accountData.balance) || 0
+        balance: parseFloat(accountData.balance) || 0,
+        is_primary: accountData.is_primary || false
       };
 
       if (accountData.id) {
@@ -278,7 +279,8 @@ const App = () => {
       const dataToSave = {
         ...transactionData,
         user_id: user.id,
-        amount: parseFloat(transactionData.amount) || 0
+        amount: parseFloat(transactionData.amount) || 0,
+        is_alimony: transactionData.is_alimony || false
       };
 
       if (transactionData.id) {
@@ -875,6 +877,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
