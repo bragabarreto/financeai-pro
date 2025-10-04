@@ -26,14 +26,26 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
   ];
 
   useEffect(() => {
-    if (account) {
-      setFormData({
-        ...account,
-        is_primary: account.is_primary || false
-      });
-    }
-  }, [account]);
-
+  if (account) {
+    // Editando conta existente
+    setFormData({
+      name: account.name || '',
+      type: account.type || 'checking',
+      balance: account.balance || 0,
+      color: account.color || 'bg-blue-500',
+      is_primary: account.is_primary || false
+    });
+  } else {
+    // Nova conta - NÃO incluir ID
+    setFormData({
+      name: '',
+      type: 'checking',
+      balance: 0,
+      color: 'bg-blue-500',
+      is_primary: false
+    });
+  }
+}, [account]);
   const handleSubmit = async (e) => {
   e.preventDefault();
   
@@ -190,5 +202,6 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
 };
 
 export default AccountModal;
+
 
 
