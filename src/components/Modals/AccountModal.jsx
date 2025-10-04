@@ -35,25 +35,45 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
   }, [account]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      setError('Nome é obrigatório');
-      return;
+  e.preventDefault();
+  
+  console.log('AccountModal - Form Data:', formData);
+  console.log('AccountModal - Has ID?', !!formData.id);
+  
+  if (!formData.name.trim()) {
+    setError('Nome é obrigatório');
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+
+  try {
+    // Certifique-se de NÃO passar ID vazio
+    const dataToSave = {
+      name: formData.name,
+      type: formData.type,
+      balance: formData.balance,
+      color: formData.color,
+      is_primary: formData.is_primary || false
+    };
+    
+    // Só adicione o ID se ele realmente existir
+    if (formData.id && formData.id !== '') {
+      dataToSave.id = formData.id;
     }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      await onSave(formData);
-      onClose();
-    } catch (err) {
-      setError(err.message || 'Erro ao salvar conta');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+    
+    console.log('AccountModal - Sending to save:', dataToSave);
+    
+    await onSave(dataToSave);
+    onClose();
+  } catch (err) {
+    console.error('Erro no modal:', err);
+    setError(err.message || 'Erro ao salvar conta');
+  } finally {
+    setLoading(false);
+  }
+};
   if (!show) return null;
 
   return (
@@ -172,3 +192,4 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
 };
 
 export default AccountModal;
+
