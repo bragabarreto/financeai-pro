@@ -4,7 +4,7 @@ import { X, AlertCircle, Star } from 'lucide-react';
 const AccountModal = ({ show, onClose, onSave, account }) => {
   const [formData, setFormData] = useState({
     name: '',
-    type: 'checking',
+    type: 'corrente',
     balance: 0,
     color: 'bg-blue-500',
     is_primary: false // NOVO CAMPO
@@ -13,11 +13,11 @@ const AccountModal = ({ show, onClose, onSave, account }) => {
   const [error, setError] = useState('');
 
   const accountTypes = [
-    { value: 'checking', label: 'Conta Corrente' },
-    { value: 'savings', label: 'Poupança' },
-    { value: 'investment', label: 'Conta Investimento' },
-    { value: 'cash', label: 'Dinheiro' },
-    { value: 'other', label: 'Outro' }
+    { value: 'corrente', label: 'Conta Corrente' },
+    { value: 'poupança', label: 'Poupança' },
+    { value: 'investimento', label: 'Conta Investimento' },
+    { value: 'dinheiro', label: 'Dinheiro' },
+    { value: 'outro', label: 'Outro' }
   ];
 
   const colors = [
