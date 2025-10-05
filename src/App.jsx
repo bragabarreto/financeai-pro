@@ -4,7 +4,7 @@ import {
   Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, 
   Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings, RefreshCw,
   LogOut, User, Trash2, Edit, X, Check, Home, ArrowUpRight, ArrowDownRight,
-  FileText
+  FileText, Upload
 } from 'lucide-react';
 import CategoryModal from './components/Modals/CategoryModal';
 import AccountModal from './components/Modals/AccountModal';
@@ -14,6 +14,7 @@ import CreditCardManager from './components/CreditCards/CreditCardManager';
 import GoalsManager from './components/Goals/GoalsManager';
 import ReportsGenerator from './components/Reports/ReportsGenerator';
 import RecurringExpenseManager from './components/RecurringExpenses/RecurringExpenseManager';
+import ImportModal from './components/Import/ImportModal';
 
 const App = () => {
   // Estados de Autenticação
@@ -39,6 +40,7 @@ const App = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingAccount, setEditingAccount] = useState(null);
   const [editingTransaction, setEditingTransaction] = useState(null);
@@ -505,6 +507,13 @@ const loadCards = async () => {
           </div>
           
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Importar</span>
+            </button>
             <span className="text-gray-600">{user.email}</span>
             <button
               onClick={handleLogout}
@@ -908,6 +917,18 @@ const loadCards = async () => {
         transaction={editingTransaction}
         categories={[...categories.expense, ...categories.income, ...categories.investment]}
         accounts={accounts}
+      />
+
+      {/* Import Modal */}
+      <ImportModal
+        show={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          loadAllData(); // Reload data after import
+        }}
+        user={user}
+        accounts={accounts}
+        categories={categories}
       />
     </div>
   );
