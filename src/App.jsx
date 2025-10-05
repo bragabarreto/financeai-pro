@@ -782,7 +782,7 @@ const loadCards = async () => {
           />
         )}
 
-        {/* Accounts Tab */}
+         {/* Accounts Tab */}
         {activeTab === 'accounts' && (
           <div className="space-y-6">
             {/* Accounts Management */}
@@ -839,12 +839,14 @@ const loadCards = async () => {
                 ))}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Aba de Configurações (agora apenas com Perfil) */}
-            {activeTab === 'settings' && (
-            <div className="space-y-6">
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
             {/* User Profile */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-6">Perfil do Usuário</h2>
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
@@ -872,7 +874,8 @@ const loadCards = async () => {
             </div>
           </div>
         )}
-      </div>{/* Continue na parte 5 */}
+      </div>
+      
       {/* Modals */}
       <CategoryModal
         show={showCategoryModal}
@@ -912,6 +915,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
