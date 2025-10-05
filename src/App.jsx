@@ -530,7 +530,7 @@ const loadCards = async () => {
               { id: 'cards', label: 'Cartões', icon: CreditCard },
               { id: 'goals', label: 'Metas', icon: Target },
               { id: 'reports', label: 'Relatórios', icon: FileText },
-              { id: 'Accounts', label: 'Contas bancárias', icon: DollarSign },
+              { id: 'accounts', label: 'Contas bancárias', icon: DollarSign },
               { id: 'settings', label: 'Configurações', icon: Settings }
             ].map(tab => (
               <button
@@ -872,7 +872,7 @@ const loadCards = async () => {
             </div>
           </div>
         )}
-      </div>{/* Continue na parte 5 */}
+      </div>{/* Continue na parte 5 */},
       {/* Modals */}
       <CategoryModal
         show={showCategoryModal}
@@ -912,6 +912,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
