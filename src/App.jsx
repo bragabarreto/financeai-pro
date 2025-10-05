@@ -872,7 +872,7 @@ const loadCards = async () => {
             </div>
           </div>
         )}
-      </div>{/* Continue na parte 5 */},
+      </div>{/* Continue na parte 5 */}
       {/* Modals */}
       <CategoryModal
         show={showCategoryModal}
@@ -912,6 +912,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
