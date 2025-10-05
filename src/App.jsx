@@ -15,6 +15,7 @@ import CreditCardManager from './components/CreditCards/CreditCardManager';
 import GoalsManager from './components/Goals/GoalsManager';
 import ReportsGenerator from './components/Reports/ReportsGenerator';
 import RecurringExpenseManager from './components/RecurringExpenses/RecurringExpenseManager';
+import ImportModal from './components/Import/ImportModal';
 
 const App = () => {
   // Estados de Autenticação
@@ -540,6 +541,13 @@ const loadCards = async () => {
           </div>
           
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Importar</span>
+            </button>
             <span className="text-gray-600">{user.email}</span>
             <button
               onClick={() => setShowImportModal(true)}
