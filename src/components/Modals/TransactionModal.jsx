@@ -126,7 +126,7 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
-            {filteredCategories.length >= 50 && (
+            {filteredCategories.length >= 150 && (
               <p className="text-xs text-yellow-600 mt-1">
                 Limite de 50 categorias atingido para este tipo
               </p>
