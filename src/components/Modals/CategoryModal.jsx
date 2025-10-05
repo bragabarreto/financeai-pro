@@ -163,6 +163,7 @@ const icons = [
                 <option value="CDB">CDB</option>
                 <option value="LCI">LCI</option>
                 <option value="LCA">LCA</option>
+                <option value="Tesouro Direto">Tesouro Direto</option>
                 <option value="criptomoedas">Criptomoedas</option>
                 <option value="outros">Outros</option>
               </select>
