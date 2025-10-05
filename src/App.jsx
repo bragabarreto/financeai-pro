@@ -4,11 +4,12 @@ import {
   Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, 
   Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings, RefreshCw,
   LogOut, User, Trash2, Edit, X, Check, Home, ArrowUpRight, ArrowDownRight,
-  FileText
+  FileText, Upload
 } from 'lucide-react';
 import CategoryModal from './components/Modals/CategoryModal';
 import AccountModal from './components/Modals/AccountModal';
 import TransactionModal from './components/Modals/TransactionModal';
+import ImportModal from './components/Modals/ImportModal';
 import Dashboard from './components/Dashboard/Dashboard';
 import CreditCardManager from './components/CreditCards/CreditCardManager';
 import GoalsManager from './components/Goals/GoalsManager';
@@ -39,6 +40,7 @@ const App = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingAccount, setEditingAccount] = useState(null);
   const [editingTransaction, setEditingTransaction] = useState(null);
@@ -341,6 +343,39 @@ const handleSaveAccount = async (accountData) => {
     }
   };
 
+  const handleBulkImportTransactions = async (transactions) => {
+    try {
+      const dataToSave = transactions.map(t => ({
+        ...t,
+        user_id: user.id,
+        amount: parseFloat(t.amount) || 0,
+        // Remover campos de UI que não fazem parte do schema
+        suggestedCategory: undefined,
+        categoryConfidence: undefined,
+        isSuggestion: undefined
+      }));
+
+      const { error } = await supabase
+        .from('transactions')
+        .insert(dataToSave);
+      
+      if (error) throw error;
+      
+      showToast(`${transactions.length} transação(ões) importada(s) com sucesso!`, 'success');
+      
+      await Promise.all([
+        loadTransactions(),
+        loadAccounts()
+      ]);
+      
+      setShowImportModal(false);
+    } catch (error) {
+      console.error('Erro ao importar transações:', error);
+      showToast('Erro ao importar transações', 'error');
+      throw error;
+    }
+  };
+
   // Função para carregar cartões de crédito
 const loadCards = async () => {
   try {
@@ -506,6 +541,13 @@ const loadCards = async () => {
           
           <div className="flex items-center space-x-4">
             <span className="text-gray-600">{user.email}</span>
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Importar</span>
+            </button>
             <button
               onClick={handleLogout}
               className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
@@ -908,6 +950,15 @@ const loadCards = async () => {
         transaction={editingTransaction}
         categories={[...categories.expense, ...categories.income, ...categories.investment]}
         accounts={accounts}
+      />
+      
+      <ImportModal
+        show={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSave={handleBulkImportTransactions}
+        categories={categories}
+        accounts={accounts}
+        userId={user?.id}
       />
     </div>
   );
