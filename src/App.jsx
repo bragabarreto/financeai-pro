@@ -530,6 +530,7 @@ const loadCards = async () => {
               { id: 'cards', label: 'Cartões', icon: CreditCard },
               { id: 'goals', label: 'Metas', icon: Target },
               { id: 'reports', label: 'Relatórios', icon: FileText },
+              { id: 'Accounts', label: 'Contas bancárias', icon: DollarSign },
               { id: 'settings', label: 'Configurações', icon: Settings }
             ].map(tab => (
               <button
@@ -781,8 +782,8 @@ const loadCards = async () => {
           />
         )}
 
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
+        {/* Accounts Tab */}
+        {activeTab === 'accounts' && (
           <div className="space-y-6">
             {/* Accounts Management */}
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -839,8 +840,11 @@ const loadCards = async () => {
               </div>
             </div>
 
+            {/* Aba de Configurações (agora apenas com Perfil) */}
+            {activeTab === 'settings' && (
+            <div className="space-y-6">
             {/* User Profile */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-6">Perfil do Usuário</h2>
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
@@ -908,6 +912,7 @@ const loadCards = async () => {
 
 export default App;
         
+
 
 
 
