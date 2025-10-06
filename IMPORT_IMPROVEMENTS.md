@@ -31,8 +31,13 @@ Este documento descreve as melhorias implementadas no sistema de importação do
 
 ### Como Funciona
 - Usuário pode alterar o tipo (Gasto/Receita/Investimento) diretamente na tabela de preview
+- Usuário pode alterar a categoria diretamente via dropdown
 - Alterações são refletidas imediatamente
 - Categorias são filtradas com base no tipo selecionado
+
+### Melhorias Adicionais
+- ✅ Detecção de tipo padrão para "gasto" quando não for possível identificar claramente
+- ✅ Melhoria na identificação automática do tipo de transação
 
 ## 3. Classificação do Meio de Pagamento
 
@@ -181,7 +186,8 @@ O sistema tenta detectar automaticamente:
 1. **Tipo de transação** usando:
    - Campo "tipo" no arquivo
    - Palavras-chave (débito, crédito, aplicação, etc.)
-   - Sinal do valor (negativo = gasto, positivo = receita)
+   - Sinal do valor (negativo = gasto)
+   - **Padrão: gasto** quando o tipo não for claro (conforme especificado nos requisitos)
 
 2. **Meio de pagamento** usando:
    - Campo "meio de pagamento" no arquivo
