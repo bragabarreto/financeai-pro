@@ -70,12 +70,15 @@ export const importTransactions = async (transactions, userId, accountId, catego
         amount: transaction.amount,
         category: categoryId,
         date: transaction.date,
+        payment_method: transaction.payment_method || null,
         created_at: new Date().toISOString(),
         metadata: {
           imported: true,
           confidence: transaction.confidence,
           original_category: transaction.category,
-          import_date: new Date().toISOString()
+          import_date: new Date().toISOString(),
+          beneficiary: transaction.beneficiary,
+          depositor: transaction.depositor
         }
       };
       
@@ -141,6 +144,9 @@ const updateAccountBalance = async (accountId, userId) => {
     if (t.type === 'income') {
       balance += t.amount;
     } else if (t.type === 'expense') {
+      balance -= t.amount;
+    } else if (t.type === 'investment') {
+      // Investments reduce balance (money moved to investment)
       balance -= t.amount;
     }
   });

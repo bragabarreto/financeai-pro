@@ -33,8 +33,26 @@ const FIELD_PATTERNS = {
     keywords: ['tipo', 'type', 'operacao', 'operação', 'natureza'],
     values: {
       expense: ['debito', 'débito', 'saida', 'saída', 'despesa', 'gasto', 'expense', 'debit', '-'],
-      income: ['credito', 'crédito', 'entrada', 'receita', 'income', 'credit', '+']
+      income: ['credito', 'crédito', 'entrada', 'receita', 'income', 'credit', '+'],
+      investment: ['investimento', 'aplicacao', 'aplicação', 'resgate', 'investment', 'invest']
     }
+  },
+  paymentMethod: {
+    keywords: ['meio', 'pagamento', 'payment', 'metodo', 'método', 'forma'],
+    values: {
+      credit_card: ['credito', 'crédito', 'credit card', 'cc'],
+      debit_card: ['debito', 'débito', 'debit', 'cartao debito', 'cartão débito'],
+      pix: ['pix'],
+      transfer: ['transferencia', 'transferência', 'ted', 'doc', 'transfer'],
+      bank_account: ['conta', 'account', 'banco', 'bank'],
+      paycheck: ['contracheque', 'folha', 'salario', 'salário', 'paycheck']
+    }
+  },
+  beneficiary: {
+    keywords: ['beneficiario', 'beneficiário', 'favorecido', 'para', 'to', 'destino']
+  },
+  depositor: {
+    keywords: ['depositante', 'origem', 'de', 'from', 'pagador']
   }
 };
 
@@ -49,7 +67,10 @@ export const detectFieldMapping = (headers) => {
     amount: null,
     description: null,
     category: null,
-    type: null
+    type: null,
+    paymentMethod: null,
+    beneficiary: null,
+    depositor: null
   };
 
   headers.forEach((header, index) => {
@@ -78,6 +99,21 @@ export const detectFieldMapping = (headers) => {
     // Check for type field
     if (!mapping.type && FIELD_PATTERNS.type.keywords.some(kw => normalizedHeader.includes(kw))) {
       mapping.type = header;
+    }
+    
+    // Check for payment method field
+    if (!mapping.paymentMethod && FIELD_PATTERNS.paymentMethod.keywords.some(kw => normalizedHeader.includes(kw))) {
+      mapping.paymentMethod = header;
+    }
+    
+    // Check for beneficiary field
+    if (!mapping.beneficiary && FIELD_PATTERNS.beneficiary.keywords.some(kw => normalizedHeader.includes(kw))) {
+      mapping.beneficiary = header;
+    }
+    
+    // Check for depositor field
+    if (!mapping.depositor && FIELD_PATTERNS.depositor.keywords.some(kw => normalizedHeader.includes(kw))) {
+      mapping.depositor = header;
     }
   });
 
@@ -157,15 +193,36 @@ export const parseAmount = (amountString) => {
  * Detect transaction type from value or type field
  * @param {String} typeField - Type field value
  * @param {Number} amount - Transaction amount
- * @returns {String} Transaction type: 'income' or 'expense'
+ * @param {String} beneficiary - Beneficiary information
+ * @param {String} depositor - Depositor information
+ * @param {String} userIdentifier - User identifier (name, CPF, etc.)
+ * @returns {String} Transaction type: 'income', 'expense', or 'investment'
  */
-export const detectTransactionType = (typeField, amount) => {
-  if (!typeField) {
-    // If no type field, assume negative amounts are expenses
-    return amount < 0 ? 'expense' : 'income';
+export const detectTransactionType = (typeField, amount, beneficiary = '', depositor = '', userIdentifier = '') => {
+  const normalizedType = typeField ? String(typeField).toLowerCase().trim() : '';
+  const normalizedBeneficiary = beneficiary ? String(beneficiary).toLowerCase().trim() : '';
+  const normalizedDepositor = depositor ? String(depositor).toLowerCase().trim() : '';
+  const normalizedUser = userIdentifier ? String(userIdentifier).toLowerCase().trim() : '';
+  
+  // Check for investment indicators in type field
+  if (FIELD_PATTERNS.type.values.investment.some(val => normalizedType.includes(val))) {
+    return 'investment';
   }
-
-  const normalizedType = String(typeField).toLowerCase().trim();
+  
+  // Check if user is both depositor and beneficiary (investment)
+  if (normalizedUser && normalizedBeneficiary && normalizedDepositor) {
+    const userIsBeneficiary = normalizedBeneficiary.includes(normalizedUser);
+    const userIsDepositor = normalizedDepositor.includes(normalizedUser);
+    
+    if (userIsBeneficiary && userIsDepositor) {
+      return 'investment';
+    }
+  }
+  
+  // Check if user is beneficiary (income)
+  if (normalizedUser && normalizedBeneficiary && normalizedBeneficiary.includes(normalizedUser)) {
+    return 'income';
+  }
   
   // Check for income indicators
   if (FIELD_PATTERNS.type.values.income.some(val => normalizedType.includes(val))) {
@@ -230,6 +287,68 @@ export const categorizeTransaction = (description) => {
 };
 
 /**
+ * Detect payment method from description or payment method field
+ * @param {String} paymentMethodField - Payment method field value
+ * @param {String} description - Transaction description
+ * @param {String} transactionType - Transaction type (expense, income, investment)
+ * @returns {String|null} Detected payment method
+ */
+export const detectPaymentMethod = (paymentMethodField, description, transactionType) => {
+  const normalizedPayment = paymentMethodField ? String(paymentMethodField).toLowerCase().trim() : '';
+  const normalizedDesc = description ? String(description).toLowerCase().trim() : '';
+  
+  // Check payment method field first
+  if (normalizedPayment) {
+    if (FIELD_PATTERNS.paymentMethod.values.pix.some(val => normalizedPayment.includes(val))) {
+      return 'pix';
+    }
+    // Check debit card before credit card to avoid false positives
+    if (FIELD_PATTERNS.paymentMethod.values.debit_card.some(val => normalizedPayment.includes(val))) {
+      return 'debit_card';
+    }
+    if (FIELD_PATTERNS.paymentMethod.values.credit_card.some(val => normalizedPayment.includes(val))) {
+      return 'credit_card';
+    }
+    if (FIELD_PATTERNS.paymentMethod.values.transfer.some(val => normalizedPayment.includes(val))) {
+      return 'transfer';
+    }
+    if (FIELD_PATTERNS.paymentMethod.values.paycheck.some(val => normalizedPayment.includes(val))) {
+      return 'paycheck';
+    }
+    if (FIELD_PATTERNS.paymentMethod.values.bank_account.some(val => normalizedPayment.includes(val))) {
+      return 'bank_account';
+    }
+  }
+  
+  // Try to infer from description
+  if (normalizedDesc) {
+    if (/(pix)/i.test(normalizedDesc)) {
+      return 'pix';
+    }
+    // Check for debit card first (more specific pattern)
+    if (/(cartao\s*debito|cartão\s*débito|debit\s*card)/i.test(normalizedDesc)) {
+      return 'debit_card';
+    }
+    if (/(cartao|cartão|card|credito|crédito)/i.test(normalizedDesc) && !/(debito|débito|debit)/i.test(normalizedDesc)) {
+      return 'credit_card';
+    }
+    if (/(ted|doc|transferencia|transferência)/i.test(normalizedDesc)) {
+      return 'transfer';
+    }
+    if (/(contracheque|folha|salario|salário)/i.test(normalizedDesc)) {
+      return 'paycheck';
+    }
+  }
+  
+  // Default based on transaction type
+  if (transactionType === 'investment') {
+    return null; // Will be selected manually
+  }
+  
+  return null; // Needs manual selection
+};
+
+/**
  * Calculate confidence score for extracted data
  * @param {Object} transaction - Extracted transaction
  * @returns {Number} Confidence score (0-100)
@@ -239,12 +358,12 @@ export const calculateConfidence = (transaction) => {
   
   // Date present and valid
   if (transaction.date && parseDate(transaction.date)) {
-    score += 30;
+    score += 25;
   }
   
   // Amount present and valid
   if (transaction.amount && transaction.amount > 0) {
-    score += 30;
+    score += 25;
   }
   
   // Description present
@@ -254,12 +373,17 @@ export const calculateConfidence = (transaction) => {
   
   // Type detected
   if (transaction.type) {
-    score += 10;
+    score += 15;
   }
   
   // Category detected
   if (transaction.category) {
     score += 10;
+  }
+  
+  // Payment method detected
+  if (transaction.payment_method) {
+    score += 5;
   }
   
   return Math.min(score, 100);
@@ -269,9 +393,10 @@ export const calculateConfidence = (transaction) => {
  * Extract transactions from parsed data
  * @param {Array} data - Parsed file data
  * @param {Object} mapping - Field mapping (optional, will auto-detect if not provided)
+ * @param {String} userIdentifier - User identifier for type detection (optional)
  * @returns {Array} Extracted transactions with metadata
  */
-export const extractTransactions = (data, mapping = null) => {
+export const extractTransactions = (data, mapping = null, userIdentifier = '') => {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return [];
   }
@@ -285,14 +410,23 @@ export const extractTransactions = (data, mapping = null) => {
     const rawAmount = row[fieldMapping.amount] || row[headers.find(h => h.toLowerCase().includes('valor'))] || 0;
     const amount = parseAmount(rawAmount);
     const typeField = row[fieldMapping.type] || '';
+    const beneficiary = row[fieldMapping.beneficiary] || '';
+    const depositor = row[fieldMapping.depositor] || '';
+    const paymentMethodField = row[fieldMapping.paymentMethod] || '';
+    
+    const transactionType = detectTransactionType(typeField, amount, beneficiary, depositor, userIdentifier);
+    const paymentMethod = detectPaymentMethod(paymentMethodField, description, transactionType);
     
     const transaction = {
       originalIndex: index,
       date: parseDate(row[fieldMapping.date] || row[headers.find(h => h.toLowerCase().includes('data'))]),
       description: String(description).trim(),
       amount: amount,
-      type: detectTransactionType(typeField, amount),
+      type: transactionType,
       category: row[fieldMapping.category] || categorizeTransaction(description),
+      payment_method: paymentMethod,
+      beneficiary: beneficiary ? String(beneficiary).trim() : null,
+      depositor: depositor ? String(depositor).trim() : null,
       rawData: row
     };
     
