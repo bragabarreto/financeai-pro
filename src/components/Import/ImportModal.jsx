@@ -460,7 +460,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                         <option value="debit_card">Cartão de Débito</option>
                         <option value="pix">PIX</option>
                         <option value="transfer">Transferência</option>
-                        <option value="bank_account">Conta Bancária</option>
                         <option value="paycheck">Contracheque</option>
                         <option value="application">Aplicação</option>
                         <option value="redemption">Resgate</option>
@@ -570,17 +569,15 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                                 <option value="debit_card">Cartão de Débito</option>
                                 <option value="pix">PIX</option>
                                 <option value="transfer">Transferência</option>
-                                <option value="bank_account">Conta Bancária</option>
                                 <option value="paycheck">Contracheque</option>
                               </>
                             )}
                             {transaction.type === 'income' && (
                               <>
-                                <option value="bank_account">Crédito em Conta</option>
+                                <option value="transfer">Transferência</option>
+                                <option value="pix">PIX</option>
                                 <option value="credit_card">Crédito em Cartão</option>
                                 <option value="paycheck">Contracheque</option>
-                                <option value="pix">PIX</option>
-                                <option value="transfer">Transferência</option>
                               </>
                             )}
                             {transaction.type === 'investment' && (
@@ -592,7 +589,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                           </select>
                         </td>
                         <td className="p-2">
-                          {(transaction.payment_method === 'credit_card' || transaction.payment_method === 'debit_card') ? (
+                          {transaction.payment_method === 'credit_card' ? (
                             <select
                               value={transaction.card_id || ''}
                               onChange={(e) => handleTransactionEdit(index, 'card_id', e.target.value)}
@@ -605,7 +602,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                                 </option>
                               ))}
                             </select>
-                          ) : (transaction.payment_method === 'bank_account' || transaction.payment_method === 'application' || transaction.payment_method === 'redemption') ? (
+                          ) : (transaction.payment_method === 'debit_card' || transaction.payment_method === 'pix' || transaction.payment_method === 'transfer' || transaction.payment_method === 'bank_account' || transaction.payment_method === 'application' || transaction.payment_method === 'redemption') ? (
                             <select
                               value={transaction.account_id || ''}
                               onChange={(e) => handleTransactionEdit(index, 'account_id', e.target.value)}

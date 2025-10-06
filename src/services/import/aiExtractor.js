@@ -322,8 +322,9 @@ export const detectPaymentMethod = (paymentMethodField, description, transaction
     if (FIELD_PATTERNS.paymentMethod.values.paycheck.some(val => normalizedPayment.includes(val))) {
       return 'paycheck';
     }
+    // Map bank_account to transfer for better specificity
     if (FIELD_PATTERNS.paymentMethod.values.bank_account.some(val => normalizedPayment.includes(val))) {
-      return 'bank_account';
+      return 'transfer';
     }
   }
   
