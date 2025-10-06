@@ -201,7 +201,7 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                 <h4 className="font-semibold mb-2">Formato esperado do CSV:</h4>
                 <pre className="text-xs bg-white p-3 rounded overflow-x-auto">
 {`Data,Descrição,Valor,Tipo
-01/01/2024,Supermercado XYZ,150.00,despesa
+01/01/2024,Supermercado XYZ,150.00,gasto
 02/01/2024,Salário,3000.00,receita`}
                 </pre>
               </div>
@@ -265,7 +265,7 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                             onChange={(e) => handleTransactionUpdate(index, 'type', e.target.value)}
                             className="w-full px-2 py-1 border rounded text-sm"
                           >
-                            <option value="expense">Despesa</option>
+                            <option value="expense">Gasto</option>
                             <option value="income">Receita</option>
                             <option value="investment">Investimento</option>
                           </select>
