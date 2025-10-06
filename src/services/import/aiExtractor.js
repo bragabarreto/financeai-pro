@@ -234,10 +234,15 @@ export const detectTransactionType = (typeField, amount, beneficiary = '', depos
     return 'expense';
   }
   
-  // When type field is ambiguous or missing, use amount as a strong hint
-  // Negative amount = expense, Positive amount = income
-  // This is the most reliable indicator for bank statements
-  return amount < 0 ? 'expense' : 'income';
+  // When type field is ambiguous or missing, default to 'expense'
+  // This is the safest default as most financial transactions are expenses
+  // Note: Negative amounts are definitely expenses
+  if (amount < 0) {
+    return 'expense';
+  }
+  
+  // Default to expense when uncertain
+  return 'expense';
 };
 
 /**

@@ -70,7 +70,13 @@ describe('aiExtractor', () => {
 
     test('should detect type from amount sign', () => {
       expect(detectTransactionType('', -100)).toBe('expense');
-      expect(detectTransactionType('', 100)).toBe('income');
+    });
+
+    test('should default to expense when type is unclear', () => {
+      // When type field is empty and amount is positive (unclear), default to expense
+      expect(detectTransactionType('', 100)).toBe('expense');
+      expect(detectTransactionType('', 50.5)).toBe('expense');
+      expect(detectTransactionType(null, 200)).toBe('expense');
     });
   });
 
