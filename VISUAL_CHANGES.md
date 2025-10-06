@@ -54,7 +54,7 @@
 
 ### 3. Payment Method + Account/Card Selection
 
-#### For Card Payments:
+#### For Credit Card Payments:
 ```
 ┌─────────────────────────┬─────────────────────────┐
 │ Meio de Pagamento       │ Conta/Cartão            │
@@ -64,36 +64,42 @@
 │   • Cartão de Crédito   │ │ • Mastercard Black    │ │
 │   • Cartão de Débito    │ │ • Nubank Platinum     │ │
 │   • PIX                 │ └─────────────────────┘ │
-│   • ...                 │                         │
-└─────────────────────────┴─────────────────────────┘
+│   • Transferência       │                         │
+│   • Contracheque        │  ← "Conta Bancária"     │
+└─────────────────────────┴    REMOVED!             ┘
 ```
 
-#### For Bank Account Payments:
+#### For Debit Card/PIX/Transfer Payments:
 ```
 ┌─────────────────────────┬─────────────────────────┐
 │ Meio de Pagamento       │ Conta/Cartão            │
 │ ┌─────────────────────┐ │ ┌─────────────────────┐ │
-│ │ Conta Bancária    ▼ │ │ │ Conta Corrente    ▼ │ │
+│ │ PIX               ▼ │ │ │ Conta Corrente    ▼ │ │
 │ └─────────────────────┘ │ │ • Conta Corrente      │ │
-│   • Conta Bancária      │ │ • Poupança            │ │
-│   • PIX                 │ │ • Investimentos       │ │
-│   • Transferência       │ └─────────────────────┘ │
+│   • Cartão de Crédito   │ │ • Poupança            │ │
+│   • Cartão de Débito    │ │ • Investimentos       │ │
+│   • PIX                 │ └─────────────────────┘ │
+│   • Transferência       │                         │
 │   • ...                 │                         │
 └─────────────────────────┴─────────────────────────┘
 ```
 
-#### For Other Payment Methods:
+#### For Other Payment Methods (e.g., Contracheque):
 ```
 ┌─────────────────────────┬─────────────────────────┐
 │ Meio de Pagamento       │ Conta/Cartão            │
 │ ┌─────────────────────┐ │                         │
-│ │ PIX               ▼ │ │      N/A                │
+│ │ Contracheque      ▼ │ │      N/A                │
 │ └─────────────────────┘ │                         │
-│   • PIX                 │   (No account/card      │
-│   • Transferência       │    selection needed)    │
-│   • ...                 │                         │
+│   • Contracheque        │   (No account/card      │
+│   • ...                 │    selection needed)    │
 └─────────────────────────┴─────────────────────────┘
 ```
+
+**Key Changes:**
+- ❌ **Removed**: "Conta Bancária" option
+- ✅ **Updated**: Debit card now shows account dropdown (not card dropdown)
+- ✅ **Updated**: PIX and Transfer now show account dropdown
 
 ---
 
