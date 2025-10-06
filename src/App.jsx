@@ -343,6 +343,39 @@ const handleSaveAccount = async (accountData) => {
     }
   };
 
+  const handleBulkImportTransactions = async (transactions) => {
+    try {
+      const dataToSave = transactions.map(t => ({
+        ...t,
+        user_id: user.id,
+        amount: parseFloat(t.amount) || 0,
+        // Remover campos de UI que não fazem parte do schema
+        suggestedCategory: undefined,
+        categoryConfidence: undefined,
+        isSuggestion: undefined
+      }));
+
+      const { error } = await supabase
+        .from('transactions')
+        .insert(dataToSave);
+      
+      if (error) throw error;
+      
+      showToast(`${transactions.length} transação(ões) importada(s) com sucesso!`, 'success');
+      
+      await Promise.all([
+        loadTransactions(),
+        loadAccounts()
+      ]);
+      
+      setShowImportModal(false);
+    } catch (error) {
+      console.error('Erro ao importar transações:', error);
+      showToast('Erro ao importar transações', 'error');
+      throw error;
+    }
+  };
+
   // Função para carregar cartões de crédito
 const loadCards = async () => {
   try {
@@ -918,17 +951,17 @@ const loadCards = async () => {
         categories={[...categories.expense, ...categories.income, ...categories.investment]}
         accounts={accounts}
       />
-
-      {/* Import Modal */}
+      
       <ImportModal
         show={showImportModal}
         onClose={() => {
           setShowImportModal(false);
-          loadAllData(); // Reload data after import
+          // Reload data after import
+          loadAllData();
         }}
         user={user}
-        accounts={accounts}
         categories={categories}
+        accounts={accounts}
       />
     </div>
   );
