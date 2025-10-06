@@ -22,16 +22,23 @@ O sistema analisa cada transação importada e sugere categorias com base em:
 
 Antes de confirmar a importação, o usuário pode:
 - ✅ Revisar todas as transações extraídas
-- ✅ Editar categoria, descrição, valor, data e tipo
+- ✅ Editar categoria com dropdown intuitivo, descrição, valor, data e tipo
 - ✅ Ver nível de confiança de cada sugestão
 - ✅ Selecionar conta bancária para cada transação
 - ✅ Remover transações indesejadas
 - ✅ Confirmar ou cancelar a importação em lote
 
 #### Indicadores Visuais
-- **Fundo amarelo**: Categoria sugerida automaticamente
-- **Fundo branco**: Categoria confirmada ou editada manualmente
-- **Texto colorido**: Nível de confiança (verde=alta, amarelo=média, vermelho=baixa)
+- **Fundo amarelo no campo de categoria**: Categoria sugerida automaticamente pelo sistema
+- **Texto "(sugerido)" no dropdown**: Indica a categoria que foi atribuída automaticamente
+- **Fundo branco no campo de categoria**: Categoria confirmada ou editada manualmente pelo usuário
+- **Texto colorido (confiança)**: Nível de confiança (verde=alta, amarelo=média, vermelho=baixa)
+
+#### Edição de Categorias
+- Todas as categorias podem ser editadas através de um dropdown
+- As categorias sugeridas automaticamente aparecem com fundo amarelo
+- Ao editar uma categoria, o destaque amarelo é removido, indicando que foi editada manualmente
+- O dropdown mostra apenas categorias compatíveis com o tipo da transação (gasto, receita ou investimento)
 
 ## Como Usar
 
@@ -59,10 +66,12 @@ Data,Descrição,Valor,Tipo
 
 ### 3. Revisar e editar
 
-1. Revise as categorias sugeridas na tabela de preview
-2. Edite qualquer campo conforme necessário
-3. Selecione a conta bancária para cada transação
-4. Remova transações indesejadas (botão X)
+1. Revise as categorias sugeridas na tabela de preview (destacadas com fundo amarelo)
+2. Clique no dropdown de categoria para alterar categorias sugeridas automaticamente
+3. Após editar uma categoria, o fundo amarelo será removido, indicando edição manual
+4. Edite outros campos conforme necessário (data, descrição, valor, tipo, meio de pagamento)
+5. Selecione a conta bancária ou cartão para cada transação
+6. Remova transações indesejadas (botão X)
 
 ### 4. Confirmar importação
 

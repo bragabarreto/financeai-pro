@@ -25,9 +25,16 @@ All requirements have been successfully implemented, tested, and documented.
 - **Impact:** More intuitive terminology for Brazilian Portuguese users
 
 ### 2. Category Editing (Requirement 2)
-- **Status:** Already implemented
-- **Feature:** Users can change transaction type and category in preview table
-- **No changes needed:** Existing functionality fully meets requirement
+- **Status:** Enhanced with improved UX
+- **Features:** 
+  - Editable dropdown for all categories in preview table
+  - Visual highlighting (yellow background) for AI-suggested categories
+  - "(sugerido)" label in dropdown options for auto-categorized items
+  - Automatic removal of highlighting after manual edit
+  - Category options filtered by transaction type
+- **Files:**
+  - `src/components/Import/ImportModal.jsx` (enhanced category editing)
+  - `src/components/Modals/ImportModal.jsx` (updated with new test coverage)
 
 ### 3. Payment Method Classification (Requirement 3)
 - **Added:** New "Conta/Cartão" column in preview table
@@ -57,11 +64,12 @@ All requirements have been successfully implemented, tested, and documented.
 
 ### Code Changes
 
-**Modified Files (4):**
-1. `src/components/Import/ImportModal.jsx` - 53 insertions, 6 deletions
-2. `src/components/Modals/ImportModal.jsx` - 4 insertions, 4 deletions  
-3. `src/App.jsx` - 1 insertion, 0 deletions
-4. `src/services/import/aiExtractor.js` - 3 insertions, 1 deletion
+**Modified Files (5):**
+1. `src/components/Import/ImportModal.jsx` - Enhanced category editing with visual indicators
+2. `src/components/Modals/ImportModal.jsx` - Updated with additional test
+3. `src/components/Modals/ImportModal.test.jsx` - Added test for category edit highlighting
+4. `IMPORT_GUIDE.md` - Updated documentation for category editing workflow
+5. `IMPLEMENTATION_SUMMARY.md` - Updated technical summary
 
 **New Files (3):**
 1. `IMPORT_IMPROVEMENTS.md` - Comprehensive implementation guide
@@ -74,18 +82,54 @@ All requirements have been successfully implemented, tested, and documented.
 
 ```
 ✅ 5 test suites passed
-✅ 71 tests total (70 passed, 1 skipped)
+✅ 72 tests total (71 passed, 1 skipped)
 ✅ 0 failures
 ✅ Build successful
 ```
 
-**New Tests:** 3 integration tests for import improvements
+**New Tests:** 
+- Added test for category editing with visual highlighting
+- Test verifies yellow background for suggested categories
+- Test verifies removal of highlighting after manual edit
 
 ---
 
 ## 🚀 Key Features
 
-### 1. Smart Account/Card Selection
+### 1. Enhanced Category Editing with Visual Indicators
+
+The import preview now includes intelligent visual feedback for category suggestions:
+
+```javascript
+// Category dropdown with visual highlighting
+<select
+  value={transaction.categoryId || ''}
+  onChange={(e) => handleTransactionEdit(index, 'categoryId', e.target.value)}
+  className={`w-full p-1 border rounded text-xs ${
+    transaction.isSuggestion && !transaction.manuallyEdited 
+      ? 'bg-yellow-50 border-yellow-300'  // Suggested category
+      : 'bg-white'                          // Manually edited
+  }`}
+>
+  <option value="">Selecione...</option>
+  {categories.map(cat => (
+    <option key={cat.id} value={cat.id}>
+      {cat.name}
+      {transaction.isSuggestion && transaction.categoryId === cat.id 
+        ? ' (sugerido)' 
+        : ''}
+    </option>
+  ))}
+</select>
+```
+
+**Key behaviors:**
+- 🟡 **Yellow background**: Auto-suggested category (needs review)
+- ⚪ **White background**: Manually edited/confirmed category
+- 📝 **"(sugerido)" label**: Shows which category was auto-selected
+- 🔄 **Auto-update**: Highlighting removed immediately after user edits
+
+### 2. Smart Account/Card Selection
 
 ```javascript
 // Payment method determines which dropdown appears

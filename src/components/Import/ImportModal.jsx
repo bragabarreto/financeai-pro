@@ -70,7 +70,24 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     try {
       const result = await processImportFile(file);
       setProcessResult(result);
-      setEditingTransactions(result.transactions.map(t => ({ ...t, selected: true })));
+      
+      // Map category names to IDs and mark auto-categorized items as suggestions
+      const transactionsWithCategoryMapping = result.transactions.map(t => {
+        const categoryList = Object.values(categories[t.type] || []);
+        const matchedCategory = categoryList.find(c => 
+          c.name.toLowerCase() === (t.category || '').toLowerCase()
+        );
+        
+        return {
+          ...t,
+          categoryId: matchedCategory ? matchedCategory.id : null,
+          isSuggestion: matchedCategory ? true : false, // Mark as suggestion if auto-categorized
+          manuallyEdited: false,
+          selected: true
+        };
+      });
+      
+      setEditingTransactions(transactionsWithCategoryMapping);
       setStep(2);
     } catch (err) {
       setError(err.message || 'Erro ao processar arquivo');
@@ -121,6 +138,22 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
   const handleTransactionEdit = (index, field, value) => {
     const updated = [...editingTransactions];
     updated[index][field] = value;
+    
+    // If editing category, mark as manually edited (remove suggestion flag)
+    if (field === 'categoryId' || field === 'category') {
+      updated[index].isSuggestion = false;
+      updated[index].manuallyEdited = true;
+      
+      // Update both category and categoryId for consistency
+      if (field === 'categoryId') {
+        // Find category name from ID
+        const categoryList = Object.values(categories[updated[index].type] || []);
+        const selectedCategory = categoryList.find(c => c.id === value);
+        updated[index].category = selectedCategory ? selectedCategory.name : value;
+        updated[index].categoryId = value;
+      }
+    }
+    
     setEditingTransactions(updated);
   };
 
@@ -348,6 +381,21 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 </div>
               )}
 
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-blue-800">Atenção: Revise as categorias sugeridas</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      As categorias foram automaticamente classificadas com base nas descrições. 
+                      Campos com <span className="bg-yellow-100 px-1 rounded">fundo amarelo</span> são sugestões automáticas. 
+                      Você pode editar qualquer categoria antes de confirmar a importação.
+                      Após editar, o campo perderá o destaque amarelo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="mb-4 flex justify-between items-center">
                 <div className="flex space-x-3">
                   <button
@@ -493,7 +541,22 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                             <option value="investment">Investimento</option>
                           </select>
                         </td>
-                        <td className="p-2 text-xs">{transaction.category}</td>
+                        <td className="p-2">
+                          <select
+                            value={transaction.categoryId || ''}
+                            onChange={(e) => handleTransactionEdit(index, 'categoryId', e.target.value)}
+                            className={`w-full p-1 border rounded text-xs ${
+                              transaction.isSuggestion && !transaction.manuallyEdited ? 'bg-yellow-50 border-yellow-300' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Selecione...</option>
+                            {Object.values(categories[transaction.type] || []).map(cat => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}{transaction.isSuggestion && !transaction.manuallyEdited && transaction.categoryId === cat.id ? ' (sugerido)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="p-2">
                           <select
                             value={transaction.payment_method || ''}

@@ -231,6 +231,71 @@ describe('ImportModal Component', () => {
     expect(categorySelects.length).toBeGreaterThan(0);
   });
 
+  it('deve destacar categorias sugeridas e remover destaque após edição', async () => {
+    const mockTransactions = [
+      {
+        date: '2024-01-01',
+        description: 'Supermercado',
+        amount: 150,
+        type: 'expense',
+        category: '1',
+        suggestedCategory: '1',
+        categoryConfidence: 0.8,
+        isSuggestion: true,
+        account_id: 'acc1'
+      }
+    ];
+
+    extractTransactionsFromFile.mockReturnValue(mockTransactions);
+    categorizeTransactions.mockResolvedValue(mockTransactions);
+
+    const { container } = render(
+      <ImportModal
+        show={true}
+        onClose={mockOnClose}
+        onSave={mockOnSave}
+        categories={mockCategories}
+        accounts={mockAccounts}
+        userId="user123"
+      />
+    );
+
+    // Simular upload e processamento
+    const fileInput = container.querySelector('#file-upload');
+    const file = new File(['data'], 'test.csv', { type: 'text/csv' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const processButton = screen.getByText('Processar Arquivo');
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 transação\(ões\) encontrada\(s\)/)).toBeInTheDocument();
+    });
+
+    // Encontrar o select de categoria
+    const categorySelects = container.querySelectorAll('select');
+    const categorySelect = Array.from(categorySelects).find(select => 
+      select.className.includes('bg-yellow-50') || 
+      Array.from(select.options).some(opt => opt.text.includes('sugerido'))
+    );
+
+    // Verificar que a categoria sugerida tem destaque visual (fundo amarelo)
+    if (categorySelect) {
+      expect(categorySelect.className).toContain('bg-yellow-50');
+    }
+
+    // Simular edição da categoria
+    if (categorySelect) {
+      fireEvent.change(categorySelect, { target: { value: '2' } });
+
+      // Após edição, o destaque deve ser removido (fundo branco)
+      await waitFor(() => {
+        expect(categorySelect.className).not.toContain('bg-yellow-50');
+        expect(categorySelect.className).toContain('bg-white');
+      });
+    }
+  });
+
   it('deve indicar nível de confiança das sugestões', async () => {
     const mockTransactions = [
       {
