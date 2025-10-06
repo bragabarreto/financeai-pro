@@ -10,7 +10,8 @@ import {
   categorizeTransaction,
   calculateConfidence,
   extractTransactions,
-  validateTransactions
+  validateTransactions,
+  detectPaymentMethod
 } from '../aiExtractor';
 
 describe('aiExtractor', () => {
@@ -51,6 +52,20 @@ describe('aiExtractor', () => {
     test('should detect income from keyword', () => {
       expect(detectTransactionType('crédito', 100)).toBe('income');
       expect(detectTransactionType('entrada', 100)).toBe('income');
+    });
+
+    test('should detect investment from keyword', () => {
+      expect(detectTransactionType('investimento', 100)).toBe('investment');
+      expect(detectTransactionType('aplicação', 100)).toBe('investment');
+      expect(detectTransactionType('resgate', 100)).toBe('investment');
+    });
+
+    test('should detect investment when user is both beneficiary and depositor', () => {
+      expect(detectTransactionType('', 100, 'João Silva', 'João Silva', 'João Silva')).toBe('investment');
+    });
+
+    test('should detect income when user is beneficiary', () => {
+      expect(detectTransactionType('', 100, 'João Silva', 'Empresa X', 'João Silva')).toBe('income');
     });
 
     test('should detect type from amount sign', () => {
@@ -95,6 +110,38 @@ describe('aiExtractor', () => {
     });
   });
 
+  describe('detectPaymentMethod', () => {
+    test('should detect PIX from payment field', () => {
+      expect(detectPaymentMethod('PIX', '', 'expense')).toBe('pix');
+    });
+
+    test('should detect credit card from payment field', () => {
+      expect(detectPaymentMethod('Cartão de Crédito', '', 'expense')).toBe('credit_card');
+    });
+
+    test('should detect debit card from payment field', () => {
+      expect(detectPaymentMethod('Cartão Débito', '', 'expense')).toBe('debit_card');
+    });
+
+    test('should detect transfer from payment field', () => {
+      expect(detectPaymentMethod('TED', '', 'expense')).toBe('transfer');
+      expect(detectPaymentMethod('Transferência', '', 'expense')).toBe('transfer');
+    });
+
+    test('should detect payment method from description', () => {
+      expect(detectPaymentMethod('', 'Pagamento via PIX', 'expense')).toBe('pix');
+      expect(detectPaymentMethod('', 'Compra no cartão de crédito', 'expense')).toBe('credit_card');
+    });
+
+    test('should return null for investment without explicit method', () => {
+      expect(detectPaymentMethod('', 'Aplicação CDB', 'investment')).toBe(null);
+    });
+
+    test('should return null when unable to detect', () => {
+      expect(detectPaymentMethod('', '', 'expense')).toBe(null);
+    });
+  });
+
   describe('calculateConfidence', () => {
     test('should give 100% for complete transaction', () => {
       const transaction = {
@@ -102,7 +149,8 @@ describe('aiExtractor', () => {
         amount: 100,
         description: 'Test transaction',
         type: 'expense',
-        category: 'alimentacao'
+        category: 'alimentacao',
+        payment_method: 'credit_card'
       };
       expect(calculateConfidence(transaction)).toBe(100);
     });

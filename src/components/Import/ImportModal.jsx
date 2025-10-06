@@ -15,6 +15,9 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
   const [selectedAccount, setSelectedAccount] = useState('');
   const [editingTransactions, setEditingTransactions] = useState([]);
   const [importResult, setImportResult] = useState(null);
+  const [bulkEditField, setBulkEditField] = useState('');
+  const [bulkEditValue, setBulkEditValue] = useState('');
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
 
   useEffect(() => {
     if (show) {
@@ -122,6 +125,33 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
   const deleteTransaction = (index) => {
     const updated = editingTransactions.filter((_, i) => i !== index);
     setEditingTransactions(updated);
+  };
+
+  const handleBulkEdit = () => {
+    if (!bulkEditField || !bulkEditValue) {
+      setError('Selecione um campo e valor para edição em lote');
+      return;
+    }
+
+    const selectedIndices = editingTransactions
+      .map((t, idx) => (t.selected ? idx : -1))
+      .filter(idx => idx !== -1);
+
+    if (selectedIndices.length === 0) {
+      setError('Selecione pelo menos uma transação para editar em lote');
+      return;
+    }
+
+    const updated = [...editingTransactions];
+    selectedIndices.forEach(idx => {
+      updated[idx][bulkEditField] = bulkEditValue;
+    });
+
+    setEditingTransactions(updated);
+    setShowBulkEdit(false);
+    setBulkEditField('');
+    setBulkEditValue('');
+    setError('');
   };
 
   if (!show) return null;
@@ -305,16 +335,86 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
               )}
 
               <div className="mb-4 flex justify-between items-center">
-                <button
-                  onClick={toggleSelectAll}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  {editingTransactions.every(t => t.selected) ? 'Desmarcar Todas' : 'Selecionar Todas'}
-                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    {editingTransactions.every(t => t.selected) ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                  </button>
+                  <button
+                    onClick={() => setShowBulkEdit(!showBulkEdit)}
+                    className="text-sm text-purple-600 hover:text-purple-800"
+                  >
+                    {showBulkEdit ? 'Fechar Edição em Lote' : 'Edição em Lote'}
+                  </button>
+                </div>
                 <p className="text-sm text-gray-600">
                   {editingTransactions.filter(t => t.selected).length} de {editingTransactions.length} selecionadas
                 </p>
               </div>
+
+              {showBulkEdit && (
+                <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <h4 className="font-semibold mb-3 text-purple-900">Edição em Lote</h4>
+                  <p className="text-sm text-purple-700 mb-3">
+                    Aplicar alterações a todas as transações selecionadas
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <select
+                      value={bulkEditField}
+                      onChange={(e) => {
+                        setBulkEditField(e.target.value);
+                        setBulkEditValue('');
+                      }}
+                      className="p-2 border rounded-lg"
+                    >
+                      <option value="">Selecione o campo...</option>
+                      <option value="type">Tipo</option>
+                      <option value="payment_method">Meio de Pagamento</option>
+                    </select>
+                    
+                    {bulkEditField === 'type' && (
+                      <select
+                        value={bulkEditValue}
+                        onChange={(e) => setBulkEditValue(e.target.value)}
+                        className="p-2 border rounded-lg"
+                      >
+                        <option value="">Selecione o valor...</option>
+                        <option value="expense">Despesa</option>
+                        <option value="income">Receita</option>
+                        <option value="investment">Investimento</option>
+                      </select>
+                    )}
+                    
+                    {bulkEditField === 'payment_method' && (
+                      <select
+                        value={bulkEditValue}
+                        onChange={(e) => setBulkEditValue(e.target.value)}
+                        className="p-2 border rounded-lg"
+                      >
+                        <option value="">Selecione o valor...</option>
+                        <option value="credit_card">Cartão de Crédito</option>
+                        <option value="debit_card">Cartão de Débito</option>
+                        <option value="pix">PIX</option>
+                        <option value="transfer">Transferência</option>
+                        <option value="bank_account">Conta Bancária</option>
+                        <option value="paycheck">Contracheque</option>
+                        <option value="application">Aplicação</option>
+                        <option value="redemption">Resgate</option>
+                      </select>
+                    )}
+                    
+                    <button
+                      onClick={handleBulkEdit}
+                      disabled={!bulkEditField || !bulkEditValue}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -326,6 +426,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                       <th className="p-2 text-left">Valor</th>
                       <th className="p-2 text-left">Tipo</th>
                       <th className="p-2 text-left">Categoria</th>
+                      <th className="p-2 text-left">Meio Pgto.</th>
                       <th className="p-2 text-left">Confiança</th>
                       <th className="p-2 text-left w-10"></th>
                     </tr>
@@ -374,9 +475,44 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                           >
                             <option value="expense">Despesa</option>
                             <option value="income">Receita</option>
+                            <option value="investment">Investimento</option>
                           </select>
                         </td>
                         <td className="p-2 text-xs">{transaction.category}</td>
+                        <td className="p-2">
+                          <select
+                            value={transaction.payment_method || ''}
+                            onChange={(e) => handleTransactionEdit(index, 'payment_method', e.target.value)}
+                            className="w-full p-1 border rounded text-xs"
+                          >
+                            <option value="">Selecionar...</option>
+                            {transaction.type === 'expense' && (
+                              <>
+                                <option value="credit_card">Cartão de Crédito</option>
+                                <option value="debit_card">Cartão de Débito</option>
+                                <option value="pix">PIX</option>
+                                <option value="transfer">Transferência</option>
+                                <option value="bank_account">Conta Bancária</option>
+                                <option value="paycheck">Contracheque</option>
+                              </>
+                            )}
+                            {transaction.type === 'income' && (
+                              <>
+                                <option value="bank_account">Crédito em Conta</option>
+                                <option value="credit_card">Crédito em Cartão</option>
+                                <option value="paycheck">Contracheque</option>
+                                <option value="pix">PIX</option>
+                                <option value="transfer">Transferência</option>
+                              </>
+                            )}
+                            {transaction.type === 'investment' && (
+                              <>
+                                <option value="application">Aplicação</option>
+                                <option value="redemption">Resgate</option>
+                              </>
+                            )}
+                          </select>
+                        </td>
                         <td className="p-2">
                           <span className={`text-xs px-2 py-1 rounded ${getConfidenceBadge(transaction.confidence)}`}>
                             {transaction.confidence}%
@@ -440,12 +576,22 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                       {editingTransactions.filter(t => t.selected && t.type === 'expense').length}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>Investimentos:</span>
+                    <span className="font-semibold text-purple-600">
+                      {editingTransactions.filter(t => t.selected && t.type === 'investment').length}
+                    </span>
+                  </div>
                   <div className="flex justify-between pt-2 border-t">
                     <span>Valor total:</span>
                     <span className="font-semibold">
                       R$ {editingTransactions
                         .filter(t => t.selected)
-                        .reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0)
+                        .reduce((sum, t) => {
+                          if (t.type === 'income') return sum + t.amount;
+                          if (t.type === 'expense') return sum - t.amount;
+                          return sum; // investments are neutral in balance
+                        }, 0)
                         .toFixed(2)}
                     </span>
                   </div>
