@@ -9,7 +9,6 @@ import {
 import CategoryModal from './components/Modals/CategoryModal';
 import AccountModal from './components/Modals/AccountModal';
 import TransactionModal from './components/Modals/TransactionModal';
-import ImportModal from './components/Modals/ImportModal';
 import Dashboard from './components/Dashboard/Dashboard';
 import CreditCardManager from './components/CreditCards/CreditCardManager';
 import GoalsManager from './components/Goals/GoalsManager';
@@ -550,13 +549,6 @@ const loadCards = async () => {
             </button>
             <span className="text-gray-600">{user.email}</span>
             <button
-              onClick={() => setShowImportModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Importar</span>
-            </button>
-            <button
               onClick={handleLogout}
               className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
             >
@@ -962,11 +954,14 @@ const loadCards = async () => {
       
       <ImportModal
         show={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSave={handleBulkImportTransactions}
+        onClose={() => {
+          setShowImportModal(false);
+          // Reload data after import
+          loadAllData();
+        }}
+        user={user}
         categories={categories}
         accounts={accounts}
-        userId={user?.id}
       />
     </div>
   );
