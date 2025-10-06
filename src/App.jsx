@@ -962,6 +962,7 @@ const loadCards = async () => {
         user={user}
         categories={categories}
         accounts={accounts}
+        cards={cards}
       />
     </div>
   );

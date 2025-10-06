@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
 
-const ImportModal = ({ show, onClose, user, accounts, categories }) => {
+const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
   const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Confirm, 4: Result
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -18,6 +18,20 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [showBulkEdit, setShowBulkEdit] = useState(false);
+
+  const getPaymentMethodLabel = (method) => {
+    const labels = {
+      credit_card: 'Cartão de Crédito',
+      debit_card: 'Cartão de Débito',
+      pix: 'PIX',
+      transfer: 'Transferência',
+      bank_account: 'Conta Bancária',
+      paycheck: 'Contracheque',
+      application: 'Aplicação',
+      redemption: 'Resgate'
+    };
+    return labels[method] || method;
+  };
 
   useEffect(() => {
     if (show) {
@@ -381,7 +395,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                         className="p-2 border rounded-lg"
                       >
                         <option value="">Selecione o valor...</option>
-                        <option value="expense">Despesa</option>
+                        <option value="expense">Gasto</option>
                         <option value="income">Receita</option>
                         <option value="investment">Investimento</option>
                       </select>
@@ -427,6 +441,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                       <th className="p-2 text-left">Tipo</th>
                       <th className="p-2 text-left">Categoria</th>
                       <th className="p-2 text-left">Meio Pgto.</th>
+                      <th className="p-2 text-left">Conta/Cartão</th>
                       <th className="p-2 text-left">Confiança</th>
                       <th className="p-2 text-left w-10"></th>
                     </tr>
@@ -473,7 +488,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                             onChange={(e) => handleTransactionEdit(index, 'type', e.target.value)}
                             className="w-full p-1 border rounded text-xs"
                           >
-                            <option value="expense">Despesa</option>
+                            <option value="expense">Gasto</option>
                             <option value="income">Receita</option>
                             <option value="investment">Investimento</option>
                           </select>
@@ -512,6 +527,37 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                               </>
                             )}
                           </select>
+                        </td>
+                        <td className="p-2">
+                          {(transaction.payment_method === 'credit_card' || transaction.payment_method === 'debit_card') ? (
+                            <select
+                              value={transaction.card_id || ''}
+                              onChange={(e) => handleTransactionEdit(index, 'card_id', e.target.value)}
+                              className="w-full p-1 border rounded text-xs"
+                            >
+                              <option value="">Selecione cartão...</option>
+                              {cards.map(card => (
+                                <option key={card.id} value={card.id}>
+                                  {card.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (transaction.payment_method === 'bank_account' || transaction.payment_method === 'application' || transaction.payment_method === 'redemption') ? (
+                            <select
+                              value={transaction.account_id || ''}
+                              onChange={(e) => handleTransactionEdit(index, 'account_id', e.target.value)}
+                              className="w-full p-1 border rounded text-xs"
+                            >
+                              <option value="">Selecione conta...</option>
+                              {accounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>
+                                  {acc.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-500">N/A</span>
+                          )}
                         </td>
                         <td className="p-2">
                           <span className={`text-xs px-2 py-1 rounded ${getConfidenceBadge(transaction.confidence)}`}>
@@ -571,7 +617,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories }) => {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Despesas:</span>
+                    <span>Gastos:</span>
                     <span className="font-semibold text-red-600">
                       {editingTransactions.filter(t => t.selected && t.type === 'expense').length}
                     </span>
