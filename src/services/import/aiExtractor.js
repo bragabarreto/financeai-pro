@@ -45,7 +45,8 @@ const FIELD_PATTERNS = {
       pix: ['pix'],
       transfer: ['transferencia', 'transferência', 'ted', 'doc', 'transfer'],
       boleto_bancario: ['boleto', 'boleto bancário', 'boleto bancario', 'banking slip'],
-      paycheck: ['contracheque', 'folha', 'salario', 'salário', 'paycheck']
+      paycheck: ['contracheque', 'folha', 'salario', 'salário', 'paycheck'],
+      bank_account: ['conta bancaria', 'conta bancária', 'bank account']
     }
   },
   beneficiary: {
@@ -315,6 +316,9 @@ export const detectPaymentMethod = (paymentMethodField, description, transaction
     }
     if (FIELD_PATTERNS.paymentMethod.values.credit_card.some(val => normalizedPayment.includes(val))) {
       return 'credit_card';
+    }
+    if (FIELD_PATTERNS.paymentMethod.values.boleto_bancario.some(val => normalizedPayment.includes(val))) {
+      return 'boleto_bancario';
     }
     if (FIELD_PATTERNS.paymentMethod.values.transfer.some(val => normalizedPayment.includes(val))) {
       return 'transfer';
