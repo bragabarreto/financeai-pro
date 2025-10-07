@@ -31,6 +31,24 @@ const SMS_PATTERNS = {
     type: 'expense',
     paymentMethod: 'pix'
   },
+  // Salary/Income: Salário, Crédito salarial, etc.
+  salary: {
+    pattern: /(?:sal[aá]rio|cr[ée]dito\s+salarial|pagamento\s+sal[aá]rio).*?R?\$?\s*([\d.,]+)/i,
+    type: 'income',
+    paymentMethod: 'transfer'
+  },
+  // Investment application: Aplicação, Investimento
+  investment_application: {
+    pattern: /(?:aplica[çc][aã]o|investimento).*?R?\$?\s*([\d.,]+)/i,
+    type: 'investment',
+    paymentMethod: 'application'
+  },
+  // Investment redemption: Resgate
+  investment_redemption: {
+    pattern: /resgate.*?R?\$?\s*([\d.,]+)/i,
+    type: 'investment',
+    paymentMethod: 'redemption'
+  },
   // Generic card transaction: Compra de R$ 89,90 em LOJA ABC em 12/03
   generic_purchase: {
     pattern: /Compra.*?R?\$?\s*([\d.,]+)\s+(?:em|no)\s+(.*?)(?:\s+em\s+(\d{1,2}\/\d{1,2}))?/i,
@@ -169,6 +187,18 @@ export const extractFromSMS = (smsText) => {
         transaction.amount = parseAmount(match[1]);
         transaction.description = cleanDescription(match[2] || 'Transferência PIX');
         transaction.date = match[3] ? parseDate(match[3], match[4]) : parseDate('');
+      } else if (bankName === 'salary') {
+        transaction.amount = parseAmount(match[1]);
+        transaction.description = 'Salário';
+        transaction.date = parseDate('');
+      } else if (bankName === 'investment_application') {
+        transaction.amount = parseAmount(match[1]);
+        transaction.description = 'Aplicação em Investimento';
+        transaction.date = parseDate('');
+      } else if (bankName === 'investment_redemption') {
+        transaction.amount = parseAmount(match[1]);
+        transaction.description = 'Resgate de Investimento';
+        transaction.date = parseDate('');
       } else if (bankName === 'generic_purchase' || bankName === 'debit' || bankName === 'transfer') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = cleanDescription(match[2] || 'Transação');

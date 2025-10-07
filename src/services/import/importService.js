@@ -62,25 +62,35 @@ export const importTransactions = async (transactions, userId, accountId, catego
       const categoryId = categoryMapping[transaction.category] || null;
       
       // Prepare transaction data
+      // Determine the correct account_id or card_id based on payment method
+      const finalAccountId = transaction.card_id ? null : (transaction.account_id || accountId);
+      const cardId = transaction.card_id || null;
+      
       const transactionData = {
         user_id: userId,
-        account_id: accountId,
+        account_id: finalAccountId,
+        card_id: cardId,
         type: transaction.type,
         description: transaction.description,
         amount: transaction.amount,
         category: categoryId,
         date: transaction.date,
         payment_method: transaction.payment_method || null,
-        created_at: new Date().toISOString(),
-        metadata: {
+        created_at: new Date().toISOString()
+      };
+      
+      // Only add metadata if the transaction has metadata-related fields
+      // This prevents errors when the metadata column doesn't exist in the database
+      if (transaction.confidence || transaction.category || transaction.beneficiary || transaction.depositor) {
+        transactionData.metadata = {
           imported: true,
           confidence: transaction.confidence,
           original_category: transaction.category,
           import_date: new Date().toISOString(),
           beneficiary: transaction.beneficiary,
           depositor: transaction.depositor
-        }
-      };
+        };
+      }
       
       // Insert into database
       const { data, error } = await supabase

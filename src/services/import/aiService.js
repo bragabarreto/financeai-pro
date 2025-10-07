@@ -195,34 +195,48 @@ const callAI = async (prompt, preferredProvider = 'gemini') => {
 };
 
 /**
- * Enhance transaction categorization using AI
+ * Enhance transaction categorization using AI and match payment forms
  * @param {Object} transaction - Transaction object
  * @param {Array} availableCategories - List of available categories
+ * @param {Array} availableCards - List of user's cards
+ * @param {Array} availableAccounts - List of user's accounts
  * @returns {Promise<Object>} Enhanced transaction with AI suggestions
  */
-export const enhanceTransactionWithAI = async (transaction, availableCategories = []) => {
+export const enhanceTransactionWithAI = async (transaction, availableCategories = [], availableCards = [], availableAccounts = []) => {
   if (!isAIAvailable()) {
     return transaction; // Return unchanged if no AI available
   }
 
   try {
     const categoryNames = availableCategories.map(c => c.name).join(', ');
+    const cardNames = availableCards.map(c => c.name).join(', ');
+    const accountNames = availableAccounts.map(a => a.name).join(', ');
     
-    const prompt = `Analyze this financial transaction and suggest the best category:
+    const prompt = `Analyze this financial transaction and suggest the best category and payment form:
 
 Transaction Details:
 - Description: ${transaction.description || 'N/A'}
 - Amount: R$ ${transaction.amount || 0}
 - Type: ${transaction.type || 'expense'}
 - Payment Method: ${transaction.payment_method || 'N/A'}
+- Raw Text: ${transaction.raw_text || 'N/A'}
 
 Available Categories: ${categoryNames || 'alimentacao, transporte, moradia, saude, lazer, educacao, outros'}
+Available Cards: ${cardNames || 'None'}
+Available Accounts: ${accountNames || 'None'}
+
+Based on the payment method and description, identify:
+1. The most suitable category
+2. If payment_method is "credit_card", which card was likely used (match card name from description if possible)
+3. If payment_method is "debit_card", "pix", "transfer", etc., which account was likely used
 
 Provide your response in JSON format:
 {
   "category": "suggested category name",
   "confidence": 0-100,
-  "reasoning": "brief explanation"
+  "reasoning": "brief explanation",
+  "suggested_card": "card name if credit_card payment, otherwise null",
+  "suggested_account": "account name if account payment, otherwise null"
 }`;
 
     const response = await callAI(prompt);
@@ -237,12 +251,32 @@ Provide your response in JSON format:
         c.name.toLowerCase() === aiSuggestion.category?.toLowerCase()
       );
       
+      // Find matching card
+      let matchedCard = null;
+      if (aiSuggestion.suggested_card && transaction.payment_method === 'credit_card') {
+        matchedCard = availableCards.find(c => 
+          c.name.toLowerCase().includes(aiSuggestion.suggested_card.toLowerCase()) ||
+          aiSuggestion.suggested_card.toLowerCase().includes(c.name.toLowerCase())
+        );
+      }
+      
+      // Find matching account
+      let matchedAccount = null;
+      if (aiSuggestion.suggested_account) {
+        matchedAccount = availableAccounts.find(a => 
+          a.name.toLowerCase().includes(aiSuggestion.suggested_account.toLowerCase()) ||
+          aiSuggestion.suggested_account.toLowerCase().includes(a.name.toLowerCase())
+        );
+      }
+      
       return {
         ...transaction,
         aiSuggestedCategory: matchedCategory?.id || null,
         aiCategoryName: aiSuggestion.category,
         aiConfidence: aiSuggestion.confidence || 0,
         aiReasoning: aiSuggestion.reasoning,
+        card_id: matchedCard?.id || transaction.card_id || null,
+        account_id: matchedAccount?.id || transaction.account_id || null,
         enhancedByAI: true
       };
     }
@@ -257,9 +291,11 @@ Provide your response in JSON format:
  * Batch enhance multiple transactions
  * @param {Array} transactions - Array of transactions
  * @param {Array} availableCategories - List of available categories
+ * @param {Array} availableCards - List of user's cards
+ * @param {Array} availableAccounts - List of user's accounts
  * @returns {Promise<Array>} Enhanced transactions
  */
-export const enhanceTransactionsWithAI = async (transactions, availableCategories = []) => {
+export const enhanceTransactionsWithAI = async (transactions, availableCategories = [], availableCards = [], availableAccounts = []) => {
   if (!isAIAvailable() || !Array.isArray(transactions) || transactions.length === 0) {
     return transactions;
   }
@@ -270,7 +306,7 @@ export const enhanceTransactionsWithAI = async (transactions, availableCategorie
   
   for (let i = 0; i < transactions.length; i += batchSize) {
     const batch = transactions.slice(i, i + batchSize);
-    const promises = batch.map(t => enhanceTransactionWithAI(t, availableCategories));
+    const promises = batch.map(t => enhanceTransactionWithAI(t, availableCategories, availableCards, availableAccounts));
     
     try {
       const results = await Promise.allSettled(promises);

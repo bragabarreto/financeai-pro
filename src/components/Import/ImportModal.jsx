@@ -9,12 +9,11 @@ import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence 
 import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus } from '../../services/import/aiService';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
-  const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Confirm, 4: Result
+  const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Result
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [processResult, setProcessResult] = useState(null);
-  const [selectedAccount, setSelectedAccount] = useState('');
   const [editingTransactions, setEditingTransactions] = useState([]);
   const [importResult, setImportResult] = useState(null);
   const [bulkEditField, setBulkEditField] = useState('');
@@ -50,7 +49,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setLoading(false);
     setError('');
     setProcessResult(null);
-    setSelectedAccount(accounts.length > 0 ? accounts[0].id : '');
     setEditingTransactions([]);
     setImportResult(null);
     setImportMode('file');
@@ -99,7 +97,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           .concat(Object.values(categories.income || []))
           .concat(Object.values(categories.investment || []));
         
-        transactions = await enhanceTransactionsWithAI(transactions, categoryList);
+        transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts);
       }
 
       // Map categories
@@ -112,11 +110,27 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
         }
         
+        // Auto-assign account or card based on payment method
+        let defaultAccountId = null;
+        let defaultCardId = null;
+        
+        if (t.payment_method === 'credit_card') {
+          // For credit card, try to match from AI or assign first available card
+          defaultCardId = t.card_id || (cards.length > 0 ? cards[0].id : null);
+        } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
+                   t.payment_method === 'transfer' || t.payment_method === 'application' || 
+                   t.payment_method === 'redemption') {
+          // For account-based payments, assign account
+          defaultAccountId = t.account_id || (accounts.length > 0 ? accounts[0].id : null);
+        }
+        
         return {
           ...t,
           categoryId: matchedCategory?.id || null,
           isSuggestion: !!matchedCategory,
-          manuallyEdited: false
+          manuallyEdited: false,
+          account_id: defaultAccountId,
+          card_id: defaultCardId
         };
       });
 
@@ -162,12 +176,28 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           c.name.toLowerCase() === (t.category || '').toLowerCase()
         );
         
+        // Auto-assign account or card based on payment method
+        let defaultAccountId = null;
+        let defaultCardId = null;
+        
+        if (t.payment_method === 'credit_card') {
+          // For credit card, assign first available card
+          defaultCardId = t.card_id || (cards.length > 0 ? cards[0].id : null);
+        } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
+                   t.payment_method === 'transfer' || t.payment_method === 'application' || 
+                   t.payment_method === 'redemption') {
+          // For account-based payments, assign account
+          defaultAccountId = t.account_id || (accounts.length > 0 ? accounts[0].id : null);
+        }
+        
         return {
           ...t,
           categoryId: matchedCategory ? matchedCategory.id : null,
           isSuggestion: matchedCategory ? true : false, // Mark as suggestion if auto-categorized
           manuallyEdited: false,
-          selected: true
+          selected: true,
+          account_id: defaultAccountId,
+          card_id: defaultCardId
         };
       });
 
@@ -179,7 +209,9 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         
         transactionsWithCategoryMapping = await enhanceTransactionsWithAI(
           transactionsWithCategoryMapping, 
-          categoryList
+          categoryList,
+          cards,
+          accounts
         );
       }
       
@@ -193,14 +225,16 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
   };
 
   const handleImport = async () => {
-    if (!selectedAccount) {
-      setError('Selecione uma conta');
-      return;
-    }
-
     const selectedTransactions = editingTransactions.filter(t => t.selected);
     if (selectedTransactions.length === 0) {
       setError('Selecione pelo menos uma transação');
+      return;
+    }
+
+    // Validate that all transactions have account_id or card_id
+    const missingLinkage = selectedTransactions.filter(t => !t.account_id && !t.card_id);
+    if (missingLinkage.length > 0) {
+      setError(`${missingLinkage.length} transação(ões) sem conta ou cartão vinculado. Por favor, vincule todas as transações.`);
       return;
     }
 
@@ -215,15 +249,18 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         categoryMapping[cat.name] = cat.id;
       });
 
+      // Use the first account as fallback (not used since we validate above)
+      const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
+
       const result = await importTransactions(
         selectedTransactions,
         user.id,
-        selectedAccount,
+        fallbackAccountId,
         categoryMapping
       );
 
       setImportResult(result);
-      setStep(4);
+      setStep(3);
     } catch (err) {
       setError(err.message || 'Erro ao importar transações');
     } finally {
@@ -321,8 +358,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
             <p className="text-sm text-gray-500 mt-1">
               {step === 1 && 'Faça upload do arquivo'}
               {step === 2 && 'Revise os dados extraídos'}
-              {step === 3 && 'Confirme a importação'}
-              {step === 4 && 'Resultado da importação'}
+              {step === 3 && 'Resultado da importação'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -336,8 +372,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
             {[
               { num: 1, label: 'Upload' },
               { num: 2, label: 'Revisão' },
-              { num: 3, label: 'Confirmar' },
-              { num: 4, label: 'Concluído' }
+              { num: 3, label: 'Concluído' }
             ].map((s, idx) => (
               <React.Fragment key={s.num}>
                 <div className="flex items-center">
@@ -348,7 +383,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   </div>
                   <span className="ml-2 hidden sm:block">{s.label}</span>
                 </div>
-                {idx < 3 && (
+                {idx < 2 && (
                   <div className={`flex-1 h-1 mx-2 ${
                     step > s.num ? 'bg-blue-600' : 'bg-gray-300'
                   }`} />
@@ -864,74 +899,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
             </div>
           )}
 
-          {/* Step 3: Confirm */}
-          {step === 3 && (
-            <div className="max-w-2xl mx-auto">
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">
-                  Selecione a conta de destino *
-                </label>
-                <select
-                  value={selectedAccount}
-                  onChange={(e) => setSelectedAccount(e.target.value)}
-                  className="w-full p-3 border rounded-lg"
-                >
-                  <option value="">Selecione uma conta</option>
-                  {accounts.map(account => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} - R$ {account.balance?.toFixed(2) || '0.00'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="bg-blue-50 p-6 rounded-lg">
-                <h3 className="font-semibold mb-4">Resumo da Importação</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Transações a importar:</span>
-                    <span className="font-semibold">
-                      {editingTransactions.filter(t => t.selected).length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Receitas:</span>
-                    <span className="font-semibold text-green-600">
-                      {editingTransactions.filter(t => t.selected && t.type === 'income').length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Gastos:</span>
-                    <span className="font-semibold text-red-600">
-                      {editingTransactions.filter(t => t.selected && t.type === 'expense').length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Investimentos:</span>
-                    <span className="font-semibold text-purple-600">
-                      {editingTransactions.filter(t => t.selected && t.type === 'investment').length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span>Valor total:</span>
-                    <span className="font-semibold">
-                      R$ {editingTransactions
-                        .filter(t => t.selected)
-                        .reduce((sum, t) => {
-                          if (t.type === 'income') return sum + t.amount;
-                          if (t.type === 'expense') return sum - t.amount;
-                          return sum; // investments are neutral in balance
-                        }, 0)
-                        .toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Result */}
-          {step === 4 && importResult && (
+          {/* Step 3: Result */}
+          {step === 3 && importResult && (
             <div className="max-w-2xl mx-auto text-center">
               <div className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center ${
                 importResult.success ? 'bg-green-100' : 'bg-yellow-100'
@@ -985,11 +954,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
             onClick={onClose}
             className="px-6 py-2 border rounded-lg hover:bg-gray-100"
           >
-            {step === 4 ? 'Fechar' : 'Cancelar'}
+            {step === 3 ? 'Fechar' : 'Cancelar'}
           </button>
 
           <div className="flex space-x-3">
-            {step > 1 && step < 4 && (
+            {step > 1 && step < 3 && (
               <button
                 onClick={() => setStep(step - 1)}
                 className="px-6 py-2 border rounded-lg hover:bg-gray-100"
@@ -1021,18 +990,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
             {step === 2 && (
               <button
-                onClick={() => setStep(3)}
-                disabled={editingTransactions.filter(t => t.selected).length === 0}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Continuar
-              </button>
-            )}
-
-            {step === 3 && (
-              <button
                 onClick={handleImport}
-                disabled={!selectedAccount || loading}
+                disabled={editingTransactions.filter(t => t.selected).length === 0 || loading}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {loading ? (
