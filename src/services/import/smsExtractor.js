@@ -8,8 +8,9 @@
  */
 const SMS_PATTERNS = {
   // CAIXA: Compra aprovada COLSANTACECIL R$ 450,00 06/10 às 16:45, ELO VIRTUAL final 6539
+  // CAIXA: Compra aprovada em RAFAEL FERNANDES SALE R$ 457,00 em 2 vezes, 06/10 as 19:55
   caixa: {
-    pattern: /(?:CAIXA|CEF):\s*Compra\s+aprovada\s+(.*?)\s+R?\$?\s*([\d.,]+)\s+(\d{1,2}\/\d{1,2})\s+às\s+(\d{1,2}:\d{2})/i,
+    pattern: /(?:CAIXA|CEF):\s*Compra\s+aprovada\s+(?:em\s+)?(.*?)\s+R?\$?\s*([\d.,\s]+)(?:\s+em\s+\d+\s+vezes?,?)?\s+(\d{1,2}\/\d{1,2})\s+[aà]s\s+(\d{1,2}:\d{2})/i,
     type: 'expense',
     paymentMethod: 'credit_card'
   },

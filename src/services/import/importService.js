@@ -79,18 +79,8 @@ export const importTransactions = async (transactions, userId, accountId, catego
         created_at: new Date().toISOString()
       };
       
-      // Only add metadata if the transaction has metadata-related fields
-      // This prevents errors when the metadata column doesn't exist in the database
-      if (transaction.confidence || transaction.category || transaction.beneficiary || transaction.depositor) {
-        transactionData.metadata = {
-          imported: true,
-          confidence: transaction.confidence,
-          original_category: transaction.category,
-          import_date: new Date().toISOString(),
-          beneficiary: transaction.beneficiary,
-          depositor: transaction.depositor
-        };
-      }
+      // Note: metadata column is not added to avoid schema errors
+      // The database schema does not include a metadata column for transactions
       
       // Insert into database
       const { data, error } = await supabase
