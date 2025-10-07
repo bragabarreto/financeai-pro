@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Upload, FileText, AlertCircle, CheckCircle, 
   Loader, Download, Eye, Edit2, Trash2, Save,
-  AlertTriangle
+  AlertTriangle, MessageSquare, Sparkles
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
+import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
+import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus } from '../../services/import/aiService';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
   const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Confirm, 4: Result
@@ -18,6 +20,9 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [importMode, setImportMode] = useState('file'); // 'file' or 'text'
+  const [smsText, setSmsText] = useState('');
+  const [useAI, setUseAI] = useState(isAIAvailable());
 
   const getPaymentMethodLabel = (method) => {
     const labels = {
@@ -48,6 +53,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setSelectedAccount(accounts.length > 0 ? accounts[0].id : '');
     setEditingTransactions([]);
     setImportResult(null);
+    setImportMode('file');
+    setSmsText('');
   };
 
   const handleFileSelect = (e) => {
@@ -55,6 +62,83 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     if (selectedFile) {
       setFile(selectedFile);
       setError('');
+    }
+  };
+
+  const handleProcessSMS = async () => {
+    if (!smsText || smsText.trim().length < 10) {
+      setError('Cole o texto do SMS ou notificação');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Extract transactions from SMS text
+      let transactions = extractMultipleFromText(smsText);
+      
+      // Validate extraction
+      const validation = validateSMSExtraction(transactions);
+      
+      if (!validation.valid) {
+        setError(validation.errors.join(', '));
+        return;
+      }
+
+      // Add confidence scores
+      transactions = transactions.map(t => ({
+        ...t,
+        confidence: calculateSMSConfidence(t),
+        selected: true
+      }));
+
+      // Use AI enhancement if available and enabled
+      if (useAI && isAIAvailable()) {
+        const categoryList = Object.values(categories.expense || [])
+          .concat(Object.values(categories.income || []))
+          .concat(Object.values(categories.investment || []));
+        
+        transactions = await enhanceTransactionsWithAI(transactions, categoryList);
+      }
+
+      // Map categories
+      const transactionsWithCategoryMapping = transactions.map(t => {
+        const categoryList = Object.values(categories[t.type] || []);
+        
+        // Try AI suggestion first, then fallback to pattern matching
+        let matchedCategory = null;
+        if (t.aiSuggestedCategory) {
+          matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
+        }
+        
+        return {
+          ...t,
+          categoryId: matchedCategory?.id || null,
+          isSuggestion: !!matchedCategory,
+          manuallyEdited: false
+        };
+      });
+
+      setProcessResult({
+        transactions: transactionsWithCategoryMapping,
+        validation,
+        metadata: {
+          source: 'sms',
+          processedAt: new Date().toISOString(),
+          totalRows: transactions.length,
+          extractedTransactions: transactions.length,
+          validTransactions: validation.validTransactions,
+          aiEnhanced: useAI && isAIAvailable()
+        }
+      });
+      
+      setEditingTransactions(transactionsWithCategoryMapping);
+      setStep(2);
+    } catch (err) {
+      setError(err.message || 'Erro ao processar SMS');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,7 +156,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       setProcessResult(result);
       
       // Map category names to IDs and mark auto-categorized items as suggestions
-      const transactionsWithCategoryMapping = result.transactions.map(t => {
+      let transactionsWithCategoryMapping = result.transactions.map(t => {
         const categoryList = Object.values(categories[t.type] || []);
         const matchedCategory = categoryList.find(c => 
           c.name.toLowerCase() === (t.category || '').toLowerCase()
@@ -86,6 +170,18 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           selected: true
         };
       });
+
+      // Use AI enhancement if available and enabled
+      if (useAI && isAIAvailable()) {
+        const categoryList = Object.values(categories.expense || [])
+          .concat(Object.values(categories.income || []))
+          .concat(Object.values(categories.investment || []));
+        
+        transactionsWithCategoryMapping = await enhanceTransactionsWithAI(
+          transactionsWithCategoryMapping, 
+          categoryList
+        );
+      }
       
       setEditingTransactions(transactionsWithCategoryMapping);
       setStep(2);
@@ -274,34 +370,66 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           {/* Step 1: Upload */}
           {step === 1 && (
             <div className="max-w-2xl mx-auto">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-500 transition">
-                <Upload className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  Selecione um arquivo para importar
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Formatos suportados: CSV, XLS, XLSX, PDF
-                </p>
-                <input
-                  type="file"
-                  accept=".csv,.xls,.xlsx,.pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
+              {/* Mode Selection */}
+              <div className="mb-6 flex gap-4">
+                <button
+                  onClick={() => setImportMode('file')}
+                  className={`flex-1 p-4 rounded-lg border-2 transition ${
+                    importMode === 'file' 
+                      ? 'border-blue-600 bg-blue-50' 
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
                 >
-                  <FileText className="w-5 h-5 mr-2" />
-                  Escolher Arquivo
-                </label>
+                  <FileText className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                  <h3 className="font-semibold">Arquivo</h3>
+                  <p className="text-sm text-gray-600 mt-1">CSV, Excel, PDF</p>
+                </button>
+                
+                <button
+                  onClick={() => setImportMode('text')}
+                  className={`flex-1 p-4 rounded-lg border-2 transition ${
+                    importMode === 'text' 
+                      ? 'border-blue-600 bg-blue-50' 
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                  <h3 className="font-semibold">SMS/Texto</h3>
+                  <p className="text-sm text-gray-600 mt-1">Notificações bancárias</p>
+                </button>
               </div>
 
-              {file && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
+              {/* File Upload Mode */}
+              {importMode === 'file' && (
+                <>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-500 transition">
+                    <Upload className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      Selecione um arquivo para importar
+                    </h3>
+                    <p className="text-gray-600 mb-4">
+                      Formatos suportados: CSV, XLS, XLSX, PDF
+                    </p>
+                    <input
+                      type="file"
+                      accept=".csv,.xls,.xlsx,.pdf"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
+                    >
+                      <FileText className="w-5 h-5 mr-2" />
+                      Escolher Arquivo
+                    </label>
+                  </div>
+
+                  {file && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
                       <FileText className="w-8 h-8 text-blue-600 mr-3" />
                       <div>
                         <p className="font-semibold">{file.name}</p>
@@ -329,6 +457,67 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   <li>Tamanho máximo do arquivo: 10MB</li>
                 </ul>
               </div>
+                </>
+              )}
+
+              {/* SMS/Text Input Mode */}
+              {importMode === 'text' && (
+                <>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                    <MessageSquare className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2 text-center">
+                      Cole o texto de SMS ou notificação bancária
+                    </h3>
+                    <p className="text-gray-600 mb-4 text-center text-sm">
+                      Suporta notificações de CAIXA, Nubank, PIX e outros bancos
+                    </p>
+                    
+                    <textarea
+                      value={smsText}
+                      onChange={(e) => setSmsText(e.target.value)}
+                      placeholder="Exemplo:&#10;CAIXA: Compra aprovada COLSANTACECIL R$ 450,00 06/10 às 16:45, ELO VIRTUAL final 6539&#10;&#10;Você pode colar múltiplas notificações, uma por linha..."
+                      className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    />
+                    
+                    {isAIAvailable() && (
+                      <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={useAI}
+                            onChange={(e) => setUseAI(e.target.checked)}
+                            className="mr-3 w-4 h-4"
+                          />
+                          <Sparkles className="w-5 h-5 text-purple-600 mr-2" />
+                          <span className="text-sm font-medium text-gray-800">
+                            Usar IA avançada para melhor categorização
+                          </span>
+                        </label>
+                        <p className="text-xs text-gray-600 mt-1 ml-9">
+                          APIs configuradas: {getAIStatus().providers.gemini.enabled && 'Gemini'} 
+                          {getAIStatus().providers.openai.enabled && ', ChatGPT'}
+                          {getAIStatus().providers.anthropic.enabled && ', Claude'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-semibold mb-2">💡 Exemplos de SMS suportados:</h4>
+                    <ul className="text-sm text-gray-700 space-y-2">
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">CAIXA:</span> Compra aprovada LOJA R$ 450,00 06/10 às 16:45
+                      </li>
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">PIX:</span> Você recebeu um Pix de R$ 250,00 de João Silva
+                      </li>
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">Nubank:</span> Compra aprovada: R$ 150,00 em RESTAURANTE XYZ
+                      </li>
+                    </ul>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -812,8 +1001,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
             {step === 1 && (
               <button
-                onClick={handleProcessFile}
-                disabled={!file || loading}
+                onClick={importMode === 'file' ? handleProcessFile : handleProcessSMS}
+                disabled={(importMode === 'file' && !file) || (importMode === 'text' && !smsText.trim()) || loading}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {loading ? (
@@ -824,7 +1013,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 ) : (
                   <>
                     <Eye className="w-5 h-5 mr-2" />
-                    Processar Arquivo
+                    {importMode === 'file' ? 'Processar Arquivo' : 'Processar SMS'}
                   </>
                 )}
               </button>
