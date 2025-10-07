@@ -46,27 +46,27 @@ Sistema agora classifica e permite seleção de:
 
 #### Para Gastos (expense):
 - Cartão de Crédito → Seleciona cartão específico
-- Cartão de Débito → Seleciona cartão específico
-- PIX
-- Transferência
-- Conta Bancária → Seleciona conta específica
+- Cartão de Débito → Seleciona conta bancária específica
+- PIX → Seleciona conta bancária específica
+- Transferência → Seleciona conta bancária específica
+- Boleto Bancário → Seleciona cartão OU conta bancária específica
 - Contracheque
 
 #### Para Receitas (income):
-- Crédito em Conta → Seleciona conta específica
+- PIX → Seleciona conta bancária específica
+- Transferência → Seleciona conta bancária específica
 - Crédito em Cartão → Seleciona cartão específico
 - Contracheque
-- PIX
-- Transferência
 
 #### Para Investimentos:
 - Aplicação → Seleciona conta específica
 - Resgate → Seleciona conta específica
 
 ### Nova Coluna na Tabela
-Adicionada coluna "Conta/Cartão" que exibe:
-- Dropdown de cartões quando meio de pagamento é cartão
-- Dropdown de contas quando meio de pagamento é conta bancária ou investimento
+Adicionada coluna "Forma de Pagamento" que exibe:
+- Dropdown de cartões quando meio de pagamento é cartão de crédito
+- Dropdown de contas quando meio de pagamento é PIX, cartão de débito, transferência ou investimento
+- Dropdown de cartões E contas quando meio de pagamento é boleto bancário
 - "N/A" para outros meios de pagamento
 
 ## 4. Edição de Variáveis no Preview
@@ -80,20 +80,30 @@ Todos os campos abaixo podem ser editados diretamente na tabela de preview:
 4. **Tipo** - Dropdown (Gasto/Receita/Investimento)
 5. **Categoria** - Texto informativo (já categorizado)
 6. **Meio de Pagamento** - Dropdown dinâmico baseado no tipo
-7. **Conta/Cartão** - Dropdown de contas ou cartões (NOVO)
+7. **Forma de Pagamento** - Dropdown de contas ou cartões (baseado no meio de pagamento)
 
 ### Como Funciona
 ```javascript
-// Lógica de seleção de conta/cartão
-{(transaction.payment_method === 'credit_card' || transaction.payment_method === 'debit_card') ? (
+// Lógica de seleção de forma de pagamento
+{(transaction.payment_method === 'credit_card') ? (
   // Mostra dropdown de cartões
   <select value={transaction.card_id}>
     {cards.map(card => <option value={card.id}>{card.name}</option>)}
   </select>
-) : (transaction.payment_method === 'bank_account' || ...) ? (
+) : (transaction.payment_method === 'pix' || transaction.payment_method === 'debit_card' || transaction.payment_method === 'transfer') ? (
   // Mostra dropdown de contas
   <select value={transaction.account_id}>
     {accounts.map(acc => <option value={acc.id}>{acc.name}</option>)}
+  </select>
+) : (transaction.payment_method === 'boleto_bancario') ? (
+  // Mostra dropdown com cartões E contas
+  <select>
+    <optgroup label="Cartões">
+      {cards.map(card => <option value={card.id}>{card.name}</option>)}
+    </optgroup>
+    <optgroup label="Contas">
+      {accounts.map(acc => <option value={acc.id}>{acc.name}</option>)}
+    </optgroup>
   </select>
 ) : (
   <span>N/A</span>
@@ -118,7 +128,7 @@ Sistema extrai e classifica automaticamente:
 Usuário revisa e pode editar:
 - ✏️ Tipo da transação (Gasto → Receita → Investimento)
 - ✏️ Meio de pagamento
-- ✏️ Conta ou cartão específico (NOVO)
+- ✏️ Forma de pagamento (conta ou cartão específico baseado no meio de pagamento)
 - ✏️ Qualquer outro campo
 
 ### Passo 4: Confirmação e Importação
@@ -134,9 +144,9 @@ Sistema valida e importa as transações selecionadas
   amount: 150.00,
   type: 'expense',          // expense/income/investment
   category: 'alimentacao',
-  payment_method: 'credit_card',  // Tipo de pagamento
-  card_id: 'card123',            // ID do cartão (NOVO)
-  account_id: null,              // OU ID da conta (NOVO)
+  payment_method: 'boleto_bancario',  // credit_card, debit_card, pix, transfer, boleto_bancario, paycheck
+  card_id: 'card123',            // ID do cartão (quando aplicável)
+  account_id: null,              // OU ID da conta (quando aplicável)
   confidence: 85
 }
 ```
