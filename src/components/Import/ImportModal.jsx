@@ -25,7 +25,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       debit_card: 'Cartão de Débito',
       pix: 'PIX',
       transfer: 'Transferência',
-      bank_account: 'Conta Bancária',
+      boleto_bancario: 'Boleto Bancário',
       paycheck: 'Contracheque',
       application: 'Aplicação',
       redemption: 'Resgate'
@@ -460,7 +460,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                         <option value="debit_card">Cartão de Débito</option>
                         <option value="pix">PIX</option>
                         <option value="transfer">Transferência</option>
-                        <option value="bank_account">Conta Bancária</option>
+                        <option value="boleto_bancario">Boleto Bancário</option>
                         <option value="paycheck">Contracheque</option>
                         <option value="application">Aplicação</option>
                         <option value="redemption">Resgate</option>
@@ -489,7 +489,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       <th className="p-2 text-left">Tipo</th>
                       <th className="p-2 text-left">Categoria</th>
                       <th className="p-2 text-left">Meio Pgto.</th>
-                      <th className="p-2 text-left">Conta/Cartão</th>
+                      <th className="p-2 text-left">Forma de Pagamento</th>
                       <th className="p-2 text-left">Confiança</th>
                       <th className="p-2 text-left w-10"></th>
                     </tr>
@@ -570,17 +570,16 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                                 <option value="debit_card">Cartão de Débito</option>
                                 <option value="pix">PIX</option>
                                 <option value="transfer">Transferência</option>
-                                <option value="bank_account">Conta Bancária</option>
+                                <option value="boleto_bancario">Boleto Bancário</option>
                                 <option value="paycheck">Contracheque</option>
                               </>
                             )}
                             {transaction.type === 'income' && (
                               <>
-                                <option value="bank_account">Crédito em Conta</option>
-                                <option value="credit_card">Crédito em Cartão</option>
-                                <option value="paycheck">Contracheque</option>
                                 <option value="pix">PIX</option>
                                 <option value="transfer">Transferência</option>
+                                <option value="credit_card">Crédito em Cartão</option>
+                                <option value="paycheck">Contracheque</option>
                               </>
                             )}
                             {transaction.type === 'investment' && (
@@ -592,7 +591,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                           </select>
                         </td>
                         <td className="p-2">
-                          {(transaction.payment_method === 'credit_card' || transaction.payment_method === 'debit_card') ? (
+                          {(transaction.payment_method === 'credit_card') ? (
                             <select
                               value={transaction.card_id || ''}
                               onChange={(e) => handleTransactionEdit(index, 'card_id', e.target.value)}
@@ -605,7 +604,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                                 </option>
                               ))}
                             </select>
-                          ) : (transaction.payment_method === 'bank_account' || transaction.payment_method === 'application' || transaction.payment_method === 'redemption') ? (
+                          ) : (transaction.payment_method === 'pix' || transaction.payment_method === 'debit_card' || transaction.payment_method === 'transfer' || transaction.payment_method === 'application' || transaction.payment_method === 'redemption') ? (
                             <select
                               value={transaction.account_id || ''}
                               onChange={(e) => handleTransactionEdit(index, 'account_id', e.target.value)}
@@ -618,6 +617,41 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                                 </option>
                               ))}
                             </select>
+                          ) : (transaction.payment_method === 'boleto_bancario') ? (
+                            <div className="space-y-1">
+                              <select
+                                value={transaction.account_id || transaction.card_id || ''}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Check if it's a card or account
+                                  const isCard = cards.find(c => c.id === value);
+                                  if (isCard) {
+                                    handleTransactionEdit(index, 'card_id', value);
+                                    handleTransactionEdit(index, 'account_id', null);
+                                  } else {
+                                    handleTransactionEdit(index, 'account_id', value);
+                                    handleTransactionEdit(index, 'card_id', null);
+                                  }
+                                }}
+                                className="w-full p-1 border rounded text-xs"
+                              >
+                                <option value="">Selecione...</option>
+                                <optgroup label="Cartões">
+                                  {cards.map(card => (
+                                    <option key={card.id} value={card.id}>
+                                      {card.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Contas">
+                                  {accounts.map(acc => (
+                                    <option key={acc.id} value={acc.id}>
+                                      {acc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                            </div>
                           ) : (
                             <span className="text-xs text-gray-500">N/A</span>
                           )}

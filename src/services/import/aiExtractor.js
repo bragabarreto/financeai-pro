@@ -44,7 +44,7 @@ const FIELD_PATTERNS = {
       debit_card: ['debito', 'débito', 'debit', 'cartao debito', 'cartão débito'],
       pix: ['pix'],
       transfer: ['transferencia', 'transferência', 'ted', 'doc', 'transfer'],
-      bank_account: ['conta', 'account', 'banco', 'bank'],
+      boleto_bancario: ['boleto', 'boleto bancário', 'boleto bancario', 'banking slip'],
       paycheck: ['contracheque', 'folha', 'salario', 'salário', 'paycheck']
     }
   },
@@ -322,8 +322,8 @@ export const detectPaymentMethod = (paymentMethodField, description, transaction
     if (FIELD_PATTERNS.paymentMethod.values.paycheck.some(val => normalizedPayment.includes(val))) {
       return 'paycheck';
     }
-    if (FIELD_PATTERNS.paymentMethod.values.bank_account.some(val => normalizedPayment.includes(val))) {
-      return 'bank_account';
+    if (FIELD_PATTERNS.paymentMethod.values.boleto_bancario.some(val => normalizedPayment.includes(val))) {
+      return 'boleto_bancario';
     }
   }
   
@@ -344,6 +344,9 @@ export const detectPaymentMethod = (paymentMethodField, description, transaction
     }
     if (/(contracheque|folha|salario|salário)/i.test(normalizedDesc)) {
       return 'paycheck';
+    }
+    if (/(boleto)/i.test(normalizedDesc)) {
+      return 'boleto_bancario';
     }
   }
   
