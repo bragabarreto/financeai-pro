@@ -609,12 +609,17 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 <div className="flex items-start">
                   <AlertCircle className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-blue-800">Atenção: Revise as categorias sugeridas</p>
+                    <p className="font-semibold text-blue-800">Atenção: Revise as categorias e formas de pagamento</p>
                     <p className="text-sm text-blue-700 mt-1">
                       As categorias foram automaticamente classificadas com base nas descrições. 
                       Campos com <span className="bg-yellow-100 px-1 rounded">fundo amarelo</span> são sugestões automáticas. 
                       Você pode editar qualquer categoria antes de confirmar a importação.
                       Após editar, o campo perderá o destaque amarelo.
+                    </p>
+                    <p className="text-sm text-blue-700 mt-2">
+                      ✓ Transações com cartão de crédito foram vinculadas automaticamente aos cartões cadastrados.<br/>
+                      ✓ Transações com débito, PIX ou transferência foram vinculadas às contas bancárias.<br/>
+                      ✓ Verifique se a vinculação está correta na coluna "Forma de Pagamento".
                     </p>
                   </div>
                 </div>
