@@ -84,11 +84,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         return;
       }
 
-      // Add confidence scores
+      // Add confidence scores and initialize is_alimony
       transactions = transactions.map(t => ({
         ...t,
         confidence: calculateSMSConfidence(t),
-        selected: true
+        selected: true,
+        is_alimony: false
       }));
 
       // Use AI enhancement if available and enabled
@@ -197,7 +198,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           manuallyEdited: false,
           selected: true,
           account_id: defaultAccountId,
-          card_id: defaultCardId
+          card_id: defaultCardId,
+          is_alimony: false
         };
       });
 
@@ -718,6 +720,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       <th className="p-2 text-left">Categoria</th>
                       <th className="p-2 text-left">Meio Pgto.</th>
                       <th className="p-2 text-left">Forma de Pagamento</th>
+                      <th className="p-2 text-left">Pensão</th>
                       <th className="p-2 text-left">Confiança</th>
                       <th className="p-2 text-left w-10"></th>
                     </tr>
@@ -881,6 +884,17 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                             </div>
                           ) : (
                             <span className="text-xs text-gray-500">N/A</span>
+                          )}
+                        </td>
+                        <td className="p-2 text-center">
+                          {transaction.type === 'expense' && (
+                            <input
+                              type="checkbox"
+                              checked={transaction.is_alimony || false}
+                              onChange={(e) => handleTransactionEdit(index, 'is_alimony', e.target.checked)}
+                              className="w-4 h-4"
+                              title="Pensão Alimentícia"
+                            />
                           )}
                         </td>
                         <td className="p-2">

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Users } from 'lucide-react';
 
-const TransactionModal = ({ show, onClose, onSave, transaction, categories, accounts }) => {
+const TransactionModal = ({ show, onClose, onSave, transaction, categories, accounts, cards = [] }) => {
   const [formData, setFormData] = useState({
     type: 'expense',
     description: '',
     amount: 0,
     category: '',
     account_id: '',
+    card_id: '',
+    payment_method: '',
     date: new Date().toISOString().split('T')[0],
     origin: '',
-    is_alimony: false // NOVO CAMPO
+    is_alimony: false
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -19,15 +21,48 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
     if (transaction) {
       setFormData({
         ...transaction,
-        is_alimony: transaction.is_alimony || false
+        is_alimony: transaction.is_alimony || false,
+        payment_method: transaction.payment_method || '',
+        card_id: transaction.card_id || '',
+        account_id: transaction.account_id || ''
+      });
+    } else {
+      // Reset form when opening for new transaction
+      setFormData({
+        type: 'expense',
+        description: '',
+        amount: 0,
+        category: '',
+        account_id: '',
+        card_id: '',
+        payment_method: '',
+        date: new Date().toISOString().split('T')[0],
+        origin: '',
+        is_alimony: false
       });
     }
-  }, [transaction]);
+  }, [transaction, show]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.description.trim() || !formData.category || !formData.account_id) {
+    if (!formData.description.trim() || !formData.category) {
       setError('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    // Validate payment method and linkage
+    if (!formData.payment_method) {
+      setError('Selecione o meio de pagamento');
+      return;
+    }
+
+    if (formData.payment_method === 'credit_card' && !formData.card_id) {
+      setError('Selecione um cartão de crédito');
+      return;
+    }
+
+    if (['debit_card', 'pix', 'transfer', 'application', 'redemption', 'paycheck'].includes(formData.payment_method) && !formData.account_id) {
+      setError('Selecione uma conta bancária');
       return;
     }
 
@@ -40,7 +75,15 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
     setError('');
 
     try {
-      await onSave(formData);
+      // Prepare data based on payment method
+      const dataToSave = {
+        ...formData,
+        // Set card_id or account_id to null based on payment method
+        card_id: formData.payment_method === 'credit_card' ? formData.card_id : null,
+        account_id: formData.payment_method === 'credit_card' ? null : formData.account_id
+      };
+      
+      await onSave(dataToSave);
       onClose();
     } catch (err) {
       setError(err.message || 'Erro ao salvar transação');
@@ -80,10 +123,10 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
             <label className="block text-sm font-medium mb-1">Tipo</label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData({...formData, type: e.target.value, is_alimony: false})}
+              onChange={(e) => setFormData({...formData, type: e.target.value, is_alimony: false, category: '', payment_method: '', card_id: '', account_id: ''})}
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="expense">Despesa</option>
+              <option value="expense">Gasto</option>
               <option value="income">Receita</option>
               <option value="investment">Investimento</option>
             </select>
@@ -134,21 +177,90 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Conta *</label>
+            <label className="block text-sm font-medium mb-1">Meio de Pagamento *</label>
             <select
-              value={formData.account_id || (primaryAccount?.id || '')}
-              onChange={(e) => setFormData({...formData, account_id: e.target.value})}
+              value={formData.payment_method}
+              onChange={(e) => {
+                const newPaymentMethod = e.target.value;
+                setFormData({
+                  ...formData, 
+                  payment_method: newPaymentMethod,
+                  // Reset card/account when changing payment method
+                  card_id: newPaymentMethod === 'credit_card' ? formData.card_id : '',
+                  account_id: newPaymentMethod !== 'credit_card' ? formData.account_id : ''
+                });
+              }}
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
               <option value="">Selecione...</option>
-              {accounts.map(acc => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} {acc.is_primary && '⭐ (Principal)'}
-                </option>
-              ))}
+              {formData.type === 'expense' && (
+                <>
+                  <option value="credit_card">Cartão de Crédito</option>
+                  <option value="debit_card">Cartão de Débito</option>
+                  <option value="pix">PIX</option>
+                  <option value="transfer">Transferência</option>
+                  <option value="paycheck">Contracheque</option>
+                </>
+              )}
+              {formData.type === 'income' && (
+                <>
+                  <option value="transfer">Transferência</option>
+                  <option value="pix">PIX</option>
+                  <option value="credit_card">Crédito em Cartão</option>
+                  <option value="paycheck">Contracheque</option>
+                </>
+              )}
+              {formData.type === 'investment' && (
+                <>
+                  <option value="application">Aplicação</option>
+                  <option value="redemption">Resgate</option>
+                </>
+              )}
             </select>
           </div>
+
+          {/* Conditional rendering: Card or Account based on payment method */}
+          {formData.payment_method === 'credit_card' ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">Cartão de Crédito *</label>
+              <select
+                value={formData.card_id}
+                onChange={(e) => setFormData({...formData, card_id: e.target.value})}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Selecione o cartão...</option>
+                {cards.map(card => (
+                  <option key={card.id} value={card.id}>
+                    {card.name} - {card.brand}
+                  </option>
+                ))}
+              </select>
+              {cards.length === 0 && (
+                <p className="text-xs text-yellow-600 mt-1">
+                  Nenhum cartão cadastrado. Cadastre um cartão na aba "Cartões".
+                </p>
+              )}
+            </div>
+          ) : formData.payment_method && formData.payment_method !== '' ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">Conta Bancária *</label>
+              <select
+                value={formData.account_id || (primaryAccount?.id || '')}
+                onChange={(e) => setFormData({...formData, account_id: e.target.value})}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Selecione...</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} {acc.is_primary && '⭐ (Principal)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div>
             <label className="block text-sm font-medium mb-1">Data *</label>

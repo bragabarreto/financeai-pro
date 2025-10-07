@@ -950,6 +950,7 @@ const loadCards = async () => {
         transaction={editingTransaction}
         categories={[...categories.expense, ...categories.income, ...categories.investment]}
         accounts={accounts}
+        cards={cards}
       />
       
       <ImportModal
