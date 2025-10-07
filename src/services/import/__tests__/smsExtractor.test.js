@@ -23,6 +23,18 @@ describe('SMS Extractor Service', () => {
       expect(result.origin).toBe('sms_import');
     });
 
+    it('deve extrair transação do formato CAIXA com parcelamento', () => {
+      const sms = 'CAIXA: Compra aprovada em RAFAEL FERNANDES SALE R$       457,00 em   2 vezes, 06/10 as 19:55, ELO final 1527. Se desconhecer envie BL1527';
+      const result = extractFromSMS(sms);
+
+      expect(result).not.toBeNull();
+      expect(result.description).toBe('RAFAEL FERNANDES SALE');
+      expect(result.amount).toBe(457);
+      expect(result.type).toBe('expense');
+      expect(result.payment_method).toBe('credit_card');
+      expect(result.origin).toBe('sms_import');
+    });
+
     it('deve extrair transação do formato Nubank', () => {
       const sms = 'Nubank: Compra aprovada: R$ 150,00 em RESTAURANTE XYZ em 15/03';
       const result = extractFromSMS(sms);
