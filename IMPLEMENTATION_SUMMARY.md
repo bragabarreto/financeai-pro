@@ -139,7 +139,11 @@ if (payment_method === 'credit_card') {
     <option>Visa Gold</option>
     <option>Mastercard Black</option>
   </select>
-} else if (payment_method === 'bank_account') {
+} else if (payment_method === 'debit_card' || 
+           payment_method === 'pix' || 
+           payment_method === 'transfer' ||
+           payment_method === 'application' ||
+           payment_method === 'redemption') {
   // Show account dropdown
   <select>
     <option>Conta Corrente</option>
@@ -147,6 +151,13 @@ if (payment_method === 'credit_card') {
   </select>
 }
 ```
+
+**Updated Logic:**
+- 💳 **Credit Card** → Shows card dropdown
+- 🏦 **Debit Card, PIX, Transfer** → Shows account dropdown
+- 💰 **Investment (Application/Redemption)** → Shows account dropdown
+- ❌ **"Conta Bancária" removed** → Use specific payment methods instead
+
 
 ### 2. Backwards Compatible
 

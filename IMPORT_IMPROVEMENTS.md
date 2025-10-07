@@ -46,28 +46,30 @@ Sistema agora classifica e permite seleção de:
 
 #### Para Gastos (expense):
 - Cartão de Crédito → Seleciona cartão específico
-- Cartão de Débito → Seleciona conta bancária específica
-- PIX → Seleciona conta bancária específica
-- Transferência → Seleciona conta bancária específica
-- Boleto Bancário → Seleciona cartão OU conta bancária específica
+- Cartão de Débito → Seleciona conta específica
+- PIX → Seleciona conta específica
+- Transferência → Seleciona conta específica
 - Contracheque
 
+**Nota:** A opção "Conta Bancária" foi removida. Use PIX, Transferência ou Cartão de Débito para transações de conta.
+
 #### Para Receitas (income):
-- PIX → Seleciona conta bancária específica
-- Transferência → Seleciona conta bancária específica
+- Transferência → Seleciona conta específica
+- PIX → Seleciona conta específica
 - Crédito em Cartão → Seleciona cartão específico
 - Contracheque
+
+**Nota:** A opção "Crédito em Conta" foi substituída por Transferência e PIX para maior precisão.
 
 #### Para Investimentos:
 - Aplicação → Seleciona conta específica
 - Resgate → Seleciona conta específica
 
 ### Nova Coluna na Tabela
-Adicionada coluna "Forma de Pagamento" que exibe:
+Adicionada coluna "Conta/Cartão" que exibe:
 - Dropdown de cartões quando meio de pagamento é cartão de crédito
-- Dropdown de contas quando meio de pagamento é PIX, cartão de débito, transferência ou investimento
-- Dropdown de cartões E contas quando meio de pagamento é boleto bancário
-- "N/A" para outros meios de pagamento
+- Dropdown de contas quando meio de pagamento é cartão de débito, PIX, transferência ou investimento
+- "N/A" para outros meios de pagamento (contracheque)
 
 ## 4. Edição de Variáveis no Preview
 
@@ -84,13 +86,17 @@ Todos os campos abaixo podem ser editados diretamente na tabela de preview:
 
 ### Como Funciona
 ```javascript
-// Lógica de seleção de forma de pagamento
-{(transaction.payment_method === 'credit_card') ? (
+// Lógica de seleção de conta/cartão
+{transaction.payment_method === 'credit_card' ? (
   // Mostra dropdown de cartões
   <select value={transaction.card_id}>
     {cards.map(card => <option value={card.id}>{card.name}</option>)}
   </select>
-) : (transaction.payment_method === 'pix' || transaction.payment_method === 'debit_card' || transaction.payment_method === 'transfer') ? (
+) : (transaction.payment_method === 'debit_card' || 
+     transaction.payment_method === 'pix' || 
+     transaction.payment_method === 'transfer' || 
+     transaction.payment_method === 'application' || 
+     transaction.payment_method === 'redemption') ? (
   // Mostra dropdown de contas
   <select value={transaction.account_id}>
     {accounts.map(acc => <option value={acc.id}>{acc.name}</option>)}
