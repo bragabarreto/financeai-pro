@@ -82,7 +82,7 @@ Todos os campos abaixo podem ser editados diretamente na tabela de preview:
 4. **Tipo** - Dropdown (Gasto/Receita/Investimento)
 5. **Categoria** - Texto informativo (já categorizado)
 6. **Meio de Pagamento** - Dropdown dinâmico baseado no tipo
-7. **Conta/Cartão** - Dropdown de contas ou cartões (NOVO)
+7. **Forma de Pagamento** - Dropdown de contas ou cartões (baseado no meio de pagamento)
 
 ### Como Funciona
 ```javascript
@@ -100,6 +100,16 @@ Todos os campos abaixo podem ser editados diretamente na tabela de preview:
   // Mostra dropdown de contas
   <select value={transaction.account_id}>
     {accounts.map(acc => <option value={acc.id}>{acc.name}</option>)}
+  </select>
+) : (transaction.payment_method === 'boleto_bancario') ? (
+  // Mostra dropdown com cartões E contas
+  <select>
+    <optgroup label="Cartões">
+      {cards.map(card => <option value={card.id}>{card.name}</option>)}
+    </optgroup>
+    <optgroup label="Contas">
+      {accounts.map(acc => <option value={acc.id}>{acc.name}</option>)}
+    </optgroup>
   </select>
 ) : (
   <span>N/A</span>
@@ -124,7 +134,7 @@ Sistema extrai e classifica automaticamente:
 Usuário revisa e pode editar:
 - ✏️ Tipo da transação (Gasto → Receita → Investimento)
 - ✏️ Meio de pagamento
-- ✏️ Conta ou cartão específico (NOVO)
+- ✏️ Forma de pagamento (conta ou cartão específico baseado no meio de pagamento)
 - ✏️ Qualquer outro campo
 
 ### Passo 4: Confirmação e Importação
@@ -140,9 +150,9 @@ Sistema valida e importa as transações selecionadas
   amount: 150.00,
   type: 'expense',          // expense/income/investment
   category: 'alimentacao',
-  payment_method: 'credit_card',  // Tipo de pagamento
-  card_id: 'card123',            // ID do cartão (NOVO)
-  account_id: null,              // OU ID da conta (NOVO)
+  payment_method: 'boleto_bancario',  // credit_card, debit_card, pix, transfer, boleto_bancario, paycheck
+  card_id: 'card123',            // ID do cartão (quando aplicável)
+  account_id: null,              // OU ID da conta (quando aplicável)
   confidence: 85
 }
 ```

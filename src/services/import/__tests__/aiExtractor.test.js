@@ -139,6 +139,17 @@ describe('aiExtractor', () => {
       expect(detectPaymentMethod('', 'Compra no cartão de crédito', 'expense')).toBe('credit_card');
     });
 
+    test('should detect boleto bancario from payment field', () => {
+      expect(detectPaymentMethod('Boleto', '', 'expense')).toBe('boleto_bancario');
+      expect(detectPaymentMethod('Boleto Bancário', '', 'expense')).toBe('boleto_bancario');
+      expect(detectPaymentMethod('BOLETO BANCARIO', '', 'expense')).toBe('boleto_bancario');
+    });
+
+    test('should detect boleto bancario from description', () => {
+      expect(detectPaymentMethod('', 'Pagamento BOLETO CONTA LUZ', 'expense')).toBe('boleto_bancario');
+      expect(detectPaymentMethod('', 'BOLETO CEMIG', 'expense')).toBe('boleto_bancario');
+    });
+
     test('should return null for investment without explicit method', () => {
       expect(detectPaymentMethod('', 'Aplicação CDB', 'investment')).toBe(null);
     });

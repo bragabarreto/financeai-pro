@@ -32,14 +32,13 @@ As transações agora são classificadas em três categorias:
 - **Cartão de Débito**: Selecionar entre contas bancárias cadastradas
 - **PIX**: Selecionar entre contas bancárias cadastradas
 - **Transferência Bancária**: TED/DOC entre contas bancárias
-- **Conta Bancária**: Débito direto em conta
+- **Boleto Bancário**: Selecionar entre cartões de crédito OU contas bancárias
 - **Contracheque**: Desconto em folha de pagamento
 
 #### Para Receitas:
-- **Crédito em Conta**: Selecionar entre contas bancárias cadastradas
+- **PIX**: Recebimento via PIX, selecionar conta bancária
+- **Transferência**: Recebimento via TED/DOC, selecionar conta bancária
 - **Crédito em Cartão de Crédito**: Selecionar entre cartões cadastrados
-- **PIX**: Recebimento via PIX
-- **Transferência**: Recebimento via TED/DOC
 - **Contracheque**: Recebimento de salário
 
 #### Para Investimentos:
@@ -110,7 +109,7 @@ As opções de meio de pagamento mudam automaticamente conforme o tipo da transa
 ```javascript
 {
   type: 'expense' | 'income' | 'investment',
-  payment_method: 'credit_card' | 'debit_card' | 'pix' | 'transfer' | 'bank_account' | 'paycheck' | 'application' | 'redemption',
+  payment_method: 'credit_card' | 'debit_card' | 'pix' | 'transfer' | 'boleto_bancario' | 'paycheck' | 'application' | 'redemption',
   beneficiary: String,  // Armazenado em metadata
   depositor: String,    // Armazenado em metadata
   metadata: {
