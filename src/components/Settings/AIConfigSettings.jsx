@@ -67,6 +67,7 @@ const AIConfigSettings = ({ user }) => {
   const loadConfig = async () => {
     setLoading(true);
     try {
+      // Try to load from database first
       const { data, error } = await supabase
         .from('user_settings')
         .select('ai_config')
@@ -74,6 +75,21 @@ const AIConfigSettings = ({ user }) => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
+        // If table doesn't exist, try localStorage
+        if (error.code === '42P01' || error.message.includes('relation') || error.message.includes('does not exist')) {
+          console.warn('Tabela user_settings não existe, carregando do localStorage');
+          const localConfig = localStorage.getItem('ai_config');
+          if (localConfig) {
+            const parsed = JSON.parse(localConfig);
+            setConfig({
+              enabled: parsed.enabled || false,
+              provider: parsed.provider || 'gemini',
+              model: parsed.model || '',
+              apiKey: parsed.apiKey || ''
+            });
+          }
+          return;
+        }
         throw error;
       }
 
@@ -84,9 +100,36 @@ const AIConfigSettings = ({ user }) => {
           model: data.ai_config.model || '',
           apiKey: data.ai_config.apiKey || ''
         });
+      } else {
+        // Fallback to localStorage if no data in database
+        const localConfig = localStorage.getItem('ai_config');
+        if (localConfig) {
+          const parsed = JSON.parse(localConfig);
+          setConfig({
+            enabled: parsed.enabled || false,
+            provider: parsed.provider || 'gemini',
+            model: parsed.model || '',
+            apiKey: parsed.apiKey || ''
+          });
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar configuração:', error);
+      // Try localStorage as last resort
+      try {
+        const localConfig = localStorage.getItem('ai_config');
+        if (localConfig) {
+          const parsed = JSON.parse(localConfig);
+          setConfig({
+            enabled: parsed.enabled || false,
+            provider: parsed.provider || 'gemini',
+            model: parsed.model || '',
+            apiKey: parsed.apiKey || ''
+          });
+        }
+      } catch (localError) {
+        console.error('Erro ao carregar do localStorage:', localError);
+      }
     } finally {
       setLoading(false);
     }
@@ -105,6 +148,7 @@ const AIConfigSettings = ({ user }) => {
 
       // Test API key if enabled
       if (config.enabled && config.apiKey) {
+        setMessage({ type: 'info', text: 'Testando chave API...' });
         const testResult = await testAPIKey();
         if (!testResult.success) {
           setMessage({ type: 'error', text: `Erro ao testar API: ${testResult.error}` });
@@ -112,41 +156,62 @@ const AIConfigSettings = ({ user }) => {
         }
       }
 
-      // Save to database
-      const { error } = await supabase
-        .from('user_settings')
-        .upsert({
-          user_id: user.id,
-          ai_config: {
-            enabled: config.enabled,
-            provider: config.provider,
-            model: config.model || getDefaultModel(config.provider),
-            apiKey: config.apiKey
-          },
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
+      const configData = {
+        enabled: config.enabled,
+        provider: config.provider,
+        model: config.model || getDefaultModel(config.provider),
+        apiKey: config.apiKey
+      };
 
-      if (error) throw error;
+      // Try to save to database
+      try {
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert({
+            user_id: user.id,
+            ai_config: configData,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
 
-      setMessage({ type: 'success', text: 'Configuração salva com sucesso!' });
+        if (error) {
+          // Check if table doesn't exist
+          if (error.code === '42P01' || error.message.includes('relation') || error.message.includes('does not exist')) {
+            console.warn('Tabela user_settings não existe, salvando apenas no localStorage');
+            throw new Error('TABLE_NOT_EXISTS');
+          }
+          throw error;
+        }
+        
+        setMessage({ type: 'success', text: 'Configuração salva com sucesso no banco de dados!' });
+        
+      } catch (dbError) {
+        // Fallback to localStorage only
+        if (dbError.message === 'TABLE_NOT_EXISTS') {
+          console.log('Usando fallback para localStorage');
+          setMessage({ 
+            type: 'warning', 
+            text: 'Configuração salva localmente. Execute o script SQL no Supabase para persistência completa.' 
+          });
+        } else {
+          throw dbError;
+        }
+      }
       
-      // Store in localStorage for quick access
+      // Always store in localStorage for quick access
       if (config.enabled) {
-        localStorage.setItem('ai_config', JSON.stringify({
-          enabled: config.enabled,
-          provider: config.provider,
-          model: config.model || getDefaultModel(config.provider),
-          apiKey: config.apiKey
-        }));
+        localStorage.setItem('ai_config', JSON.stringify(configData));
       } else {
         localStorage.removeItem('ai_config');
       }
       
     } catch (error) {
       console.error('Erro ao salvar configuração:', error);
-      setMessage({ type: 'error', text: 'Erro ao salvar configuração' });
+      setMessage({ 
+        type: 'error', 
+        text: `Erro ao salvar: ${error.message || 'Erro desconhecido'}. Verifique se executou o script SQL no Supabase.` 
+      });
     } finally {
       setSaving(false);
     }
@@ -362,14 +427,20 @@ const AIConfigSettings = ({ user }) => {
         {/* Message */}
         {message.text && (
           <div className={`p-4 rounded-lg flex items-center space-x-3 ${
-            message.type === 'success' ? 'bg-green-50 text-green-900' : 'bg-red-50 text-red-900'
+            message.type === 'success' 
+              ? 'bg-green-50 text-green-900 border border-green-200' 
+              : message.type === 'warning'
+              ? 'bg-yellow-50 text-yellow-900 border border-yellow-200'
+              : message.type === 'info'
+              ? 'bg-blue-50 text-blue-900 border border-blue-200'
+              : 'bg-red-50 text-red-900 border border-red-200'
           }`}>
             {message.type === 'success' ? (
               <CheckCircle className="w-5 h-5" />
             ) : (
               <AlertCircle className="w-5 h-5" />
             )}
-            <span>{message.text}</span>
+            <span className="text-sm">{message.text}</span>
           </div>
         )}
 
