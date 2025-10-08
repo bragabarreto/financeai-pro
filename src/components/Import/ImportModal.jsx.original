@@ -7,7 +7,6 @@ import {
 import { processImportFile, importTransactions } from '../../services/import/importService';
 import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
 import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus } from '../../services/import/aiService';
-import { extractFromPhoto } from '../../services/import/photoExtractorAI';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
   const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Result
@@ -20,9 +19,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [showBulkEdit, setShowBulkEdit] = useState(false);
-  const [importMode, setImportMode] = useState('file'); // 'file', 'text', or 'photo'
+  const [importMode, setImportMode] = useState('file'); // 'file' or 'text'
   const [smsText, setSmsText] = useState('');
-  const [photoFile, setPhotoFile] = useState(null);
   const [useAI, setUseAI] = useState(isAIAvailable());
 
   const getPaymentMethodLabel = (method) => {
@@ -55,7 +53,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setImportResult(null);
     setImportMode('file');
     setSmsText('');
-    setPhotoFile(null);
   };
 
   const handleFileSelect = (e) => {
@@ -155,99 +152,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       setStep(2);
     } catch (err) {
       setError(err.message || 'Erro ao processar SMS');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleProcessPhoto = async () => {
-    if (!photoFile) {
-      setError('Selecione uma foto');
-      return;
-    }
-
-    if (!useAI || !isAIAvailable()) {
-      setError('Extração de fotos requer IA configurada. Vá em Configurações → Configuração de IA');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Extract transaction from photo
-      const transaction = await extractFromPhoto(photoFile, cards);
-      
-      if (!transaction) {
-        setError('Não foi possível extrair dados da foto. Tente outra imagem.');
-        return;
-      }
-
-      // Wrap in array for consistency
-      let transactions = [transaction];
-
-      // Add confidence scores and initialize is_alimony
-      transactions = transactions.map(t => ({
-        ...t,
-        confidence: t.confidence || 90,
-        selected: true,
-        is_alimony: false
-      }));
-
-      // Map categories
-      const transactionsWithCategoryMapping = transactions.map(t => {
-        const categoryList = Object.values(categories[t.type] || []);
-        
-        // Try AI suggestion
-        let matchedCategory = null;
-        if (t.aiSuggestedCategory) {
-          matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
-        }
-        
-        // Auto-assign account or card based on payment method
-        let defaultAccountId = null;
-        let defaultCardId = null;
-        
-        if (t.payment_method === 'credit_card') {
-          defaultCardId = t.card_id || (cards.length > 0 ? cards[0].id : null);
-        } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
-                   t.payment_method === 'transfer') {
-          defaultAccountId = t.account_id || (accounts.length > 0 ? accounts[0].id : null);
-        }
-        
-        return {
-          ...t,
-          categoryId: matchedCategory?.id || null,
-          isSuggestion: !!matchedCategory,
-          manuallyEdited: false,
-          account_id: defaultAccountId,
-          card_id: defaultCardId
-        };
-      });
-
-      const validation = {
-        valid: true,
-        validTransactions: 1,
-        warnings: []
-      };
-
-      setProcessResult({
-        transactions: transactionsWithCategoryMapping,
-        validation,
-        metadata: {
-          source: 'photo',
-          processedAt: new Date().toISOString(),
-          totalRows: 1,
-          extractedTransactions: 1,
-          validTransactions: 1,
-          aiEnhanced: true
-        }
-      });
-      
-      setEditingTransactions(transactionsWithCategoryMapping);
-      setStep(2);
-    } catch (err) {
-      setError(err.message || 'Erro ao processar foto');
     } finally {
       setLoading(false);
     }
@@ -530,19 +434,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   <h3 className="font-semibold">SMS/Texto</h3>
                   <p className="text-sm text-gray-600 mt-1">Notificações bancárias</p>
                 </button>
-                
-                <button
-                  onClick={() => setImportMode('photo')}
-                  className={`flex-1 p-4 rounded-lg border-2 transition ${
-                    importMode === 'photo' 
-                      ? 'border-blue-600 bg-blue-50' 
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <Eye className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                  <h3 className="font-semibold">Foto</h3>
-                  <p className="text-sm text-gray-600 mt-1">Comprovantes e notificações</p>
-                </button>
               </div>
 
               {/* File Upload Mode */}
@@ -659,104 +550,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       </li>
                       <li className="bg-white p-2 rounded">
                         <span className="font-medium">Nubank:</span> Compra aprovada: R$ 150,00 em RESTAURANTE XYZ
-                      </li>
-                    </ul>
-                  </div>
-                </>
-              )}
-
-              {/* Photo Upload Mode */}
-              {importMode === 'photo' && (
-                <>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
-                    <Eye className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-semibold mb-2 text-center">
-                      Envie foto de comprovante ou notificação
-                    </h3>
-                    <p className="text-gray-600 mb-4 text-center text-sm">
-                      Suporta comprovantes PIX, notificações de cartão, recibos
-                    </p>
-                    
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setPhotoFile(e.target.files[0])}
-                      className="hidden"
-                      id="photo-upload"
-                    />
-                    <label
-                      htmlFor="photo-upload"
-                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer mx-auto block w-fit"
-                    >
-                      <Eye className="w-5 h-5 mr-2" />
-                      Escolher Foto
-                    </label>
-                    
-                    {photoFile && (
-                      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <Eye className="w-8 h-8 text-blue-600 mr-3" />
-                            <div>
-                              <p className="font-semibold">{photoFile.name}</p>
-                              <p className="text-sm text-gray-600">
-                                {(photoFile.size / 1024).toFixed(2)} KB
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setPhotoFile(null)}
-                            className="p-2 hover:bg-blue-100 rounded-lg"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                        
-                        {/* Preview da foto */}
-                        <div className="mt-4">
-                          <img 
-                            src={URL.createObjectURL(photoFile)} 
-                            alt="Preview" 
-                            className="max-h-64 mx-auto rounded-lg border"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    
-                    {isAIAvailable() && (
-                      <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={useAI}
-                            onChange={(e) => setUseAI(e.target.checked)}
-                            className="mr-3 w-4 h-4"
-                          />
-                          <Sparkles className="w-5 h-5 text-purple-600 mr-2" />
-                          <span className="text-sm font-medium text-gray-800">
-                            Usar IA para extração automática de dados
-                          </span>
-                        </label>
-                        <p className="text-xs text-gray-600 mt-1 ml-9">
-                          APIs configuradas: {getAIStatus().providers.gemini.enabled && 'Gemini'} 
-                          {getAIStatus().providers.openai.enabled && ', ChatGPT'}
-                          {getAIStatus().providers.anthropic.enabled && ', Claude'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-semibold mb-2">💡 Tipos de foto suportados:</h4>
-                    <ul className="text-sm text-gray-700 space-y-2">
-                      <li className="bg-white p-2 rounded">
-                        <span className="font-medium">📱 Notificações:</span> Screenshots de notificações de cartão
-                      </li>
-                      <li className="bg-white p-2 rounded">
-                        <span className="font-medium">🧾 Comprovantes PIX:</span> Tela de confirmação de PIX
-                      </li>
-                      <li className="bg-white p-2 rounded">
-                        <span className="font-medium">📄 Recibos:</span> Fotos de recibos e notas fiscais
                       </li>
                     </ul>
                   </div>
@@ -1196,17 +989,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
             {step === 1 && (
               <button
-                onClick={
-                  importMode === 'file' ? handleProcessFile : 
-                  importMode === 'text' ? handleProcessSMS : 
-                  handleProcessPhoto
-                }
-                disabled={
-                  (importMode === 'file' && !file) || 
-                  (importMode === 'text' && !smsText.trim()) || 
-                  (importMode === 'photo' && !photoFile) || 
-                  loading
-                }
+                onClick={importMode === 'file' ? handleProcessFile : handleProcessSMS}
+                disabled={(importMode === 'file' && !file) || (importMode === 'text' && !smsText.trim()) || loading}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {loading ? (
@@ -1217,9 +1001,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 ) : (
                   <>
                     <Eye className="w-5 h-5 mr-2" />
-                    {importMode === 'file' ? 'Processar Arquivo' : 
-                     importMode === 'text' ? 'Processar SMS' : 
-                     'Processar Foto'}
+                    {importMode === 'file' ? 'Processar Arquivo' : 'Processar SMS'}
                   </>
                 )}
               </button>

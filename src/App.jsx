@@ -14,8 +14,7 @@ import CreditCardManager from './components/CreditCards/CreditCardManager';
 import GoalsManager from './components/Goals/GoalsManager';
 import ReportsGenerator from './components/Reports/ReportsGenerator';
 import RecurringExpenseManager from './components/RecurringExpenses/RecurringExpenseManager';
-import ImportModalEnhanced from './components/Import/ImportModalEnhanced';
-import AIConfigSettings from './components/Settings/AIConfigSettings';
+import ImportModal from './components/Import/ImportModal';
 
 const App = () => {
   // Estados de Autenticação
@@ -888,9 +887,6 @@ const loadCards = async () => {
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            {/* AI Configuration */}
-            <AIConfigSettings user={user} />
-            
             {/* User Profile */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-6">Perfil do Usuário</h2>
@@ -957,7 +953,7 @@ const loadCards = async () => {
         cards={cards}
       />
       
-      <ImportModalEnhanced
+      <ImportModal
         show={showImportModal}
         onClose={() => {
           setShowImportModal(false);
@@ -968,7 +964,6 @@ const loadCards = async () => {
         categories={categories}
         accounts={accounts}
         cards={cards}
-        onImportSuccess={handleBulkImportTransactions}
       />
     </div>
   );
