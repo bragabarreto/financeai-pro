@@ -331,7 +331,11 @@ export const extractMultipleFromPhotos = async (imageFiles, aiConfig, cards = []
   return transactions;
 };
 
+// Export with alias for compatibility
+export const extractFromPhoto = extractFromPhotoWithAI;
+
 export default {
+  extractFromPhoto,
   extractFromPhotoWithAI,
   extractMultipleFromPhotos
 };
