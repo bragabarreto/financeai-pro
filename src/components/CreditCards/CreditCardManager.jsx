@@ -20,6 +20,7 @@ const CreditCardManager = ({ user }) => {
     name: '',
     brand: 'visa',
     last_digits: '',
+    last_digits_list: [], // Array com até 5 números de 4 dígitos
     credit_limit: '',
     closing_day: '10',
     due_day: '20',
@@ -148,6 +149,7 @@ const CreditCardManager = ({ user }) => {
       name: card.name,
       brand: card.brand,
       last_digits: card.last_digits,
+      last_digits_list: card.last_digits_list || [],
       credit_limit: card.credit_limit,
       closing_day: card.closing_day,
       due_day: card.due_day,
@@ -163,6 +165,7 @@ const CreditCardManager = ({ user }) => {
       name: '',
       brand: 'visa',
       last_digits: '',
+      last_digits_list: [],
       credit_limit: '',
       closing_day: '10',
       due_day: '20',
@@ -529,7 +532,7 @@ const CreditCardManager = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Últimos 4 Dígitos</label>
+                  <label className="block text-sm font-medium mb-1">Últimos 4 Dígitos (Principal)</label>
                   <input
                     type="text"
                     value={cardForm.last_digits}
@@ -540,6 +543,37 @@ const CreditCardManager = ({ user }) => {
                     placeholder="1234"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Números Adicionais do Cartão (até 5 - para IA identificar)
+                </label>
+                <div className="space-y-2">
+                  {[0, 1, 2, 3, 4].map((index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      value={cardForm.last_digits_list[index] || ''}
+                      onChange={(e) => {
+                        const newList = [...cardForm.last_digits_list];
+                        if (e.target.value === '') {
+                          newList.splice(index, 1);
+                        } else {
+                          newList[index] = e.target.value;
+                        }
+                        setCardForm({...cardForm, last_digits_list: newList.filter(d => d)});
+                      }}
+                      maxLength="4"
+                      pattern="[0-9]{4}"
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={`Últimos 4 dígitos ${index + 1} (opcional)`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Adicione até 5 números de 4 dígitos para ajudar a IA a identificar transações deste cartão
+                </p>
               </div>
 
               <div>

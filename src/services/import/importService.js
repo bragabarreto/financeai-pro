@@ -75,7 +75,6 @@ export const importTransactions = async (transactions, userId, accountId, catego
         amount: transaction.amount,
         category: categoryId,
         date: transaction.date,
-        payment_method: transaction.payment_method || null,
         created_at: new Date().toISOString()
       };
       
