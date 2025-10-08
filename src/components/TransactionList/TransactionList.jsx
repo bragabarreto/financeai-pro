@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit, Trash2, CreditCard, Building2, Calendar, Tag, DollarSign } from 'lucide-react';
+import { Edit, Trash2, CreditCard, Building, Calendar, Tag, DollarSign } from 'lucide-react';
 
 const TransactionList = ({ 
   transactions, 
@@ -137,7 +137,7 @@ const TransactionList = ({
                     </div>
                   ) : (
                     <div className="flex items-center space-x-2">
-                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <Building className="w-4 h-4 text-gray-400" />
                       <span>{getAccountName(transaction.account_id)}</span>
                     </div>
                   )}
