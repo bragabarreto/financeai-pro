@@ -4,7 +4,7 @@ import {
   Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, 
   Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings, RefreshCw,
   LogOut, User, Trash2, Edit, X, Check, Home, ArrowUpRight, ArrowDownRight,
-  FileText, Upload
+  FileText, Upload, FolderTree
 } from 'lucide-react';
 import CategoryModal from './components/Modals/CategoryModal';
 import AccountModal from './components/Modals/AccountModal';
@@ -15,6 +15,9 @@ import GoalsManager from './components/Goals/GoalsManager';
 import ReportsGenerator from './components/Reports/ReportsGenerator';
 import RecurringExpenseManager from './components/RecurringExpenses/RecurringExpenseManager';
 import ImportModal from './components/Import/ImportModal';
+import TransactionList from './components/TransactionList/TransactionList';
+import Portfolio from './components/Portfolio/Portfolio';
+import CategoriesManager from './components/Categories/CategoriesManager';
 
 const App = () => {
   // Estados de Autenticação
@@ -25,6 +28,8 @@ const App = () => {
   
   // Estados de Navegação
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [showCategoriesManager, setShowCategoriesManager] = useState(false);
   
   // Estados de Dados
   const [categories, setCategories] = useState({
@@ -609,6 +614,34 @@ const loadCards = async () => {
         {activeTab === 'expenses' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Gastos</h2>
+              <button
+                onClick={() => {
+                  setEditingTransaction(null);
+                  setShowTransactionModal(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Nova Transação</span>
+              </button>
+            </div>
+
+            <TransactionList
+              transactions={transactions}
+              categories={categories}
+              accounts={accounts}
+              cards={cards}
+              onEdit={(transaction) => {
+                setEditingTransaction(transaction);
+                setShowTransactionModal(true);
+              }}
+              onDelete={handleDeleteTransaction}
+              type="expense"
+              title="Transações de Gastos (Últimos 30 Dias)"
+            />
+
+            <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Categorias de Gastos</h2>
               <button
                 onClick={() => {
@@ -679,6 +712,34 @@ const loadCards = async () => {
         {activeTab === 'income' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Receitas</h2>
+              <button
+                onClick={() => {
+                  setEditingTransaction(null);
+                  setShowTransactionModal(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Nova Transação</span>
+              </button>
+            </div>
+
+            <TransactionList
+              transactions={transactions}
+              categories={categories}
+              accounts={accounts}
+              cards={cards}
+              onEdit={(transaction) => {
+                setEditingTransaction(transaction);
+                setShowTransactionModal(true);
+              }}
+              onDelete={handleDeleteTransaction}
+              type="income"
+              title="Transações de Receitas (Últimos 30 Dias)"
+            />
+
+            <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Categorias de Receitas</h2>
               <button
                 onClick={() => {
@@ -736,8 +797,45 @@ const loadCards = async () => {
         )}
 
         {/* Investments Tab */}
-        {activeTab === 'investments' && (
+        {activeTab === 'investments' && !showPortfolio && (
           <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Investimentos</h2>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowPortfolio(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  <PieChart className="w-5 h-5" />
+                  <span>Patrimônio</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setShowTransactionModal(true);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Nova Transação</span>
+                </button>
+              </div>
+            </div>
+
+            <TransactionList
+              transactions={transactions}
+              categories={categories}
+              accounts={accounts}
+              cards={cards}
+              onEdit={(transaction) => {
+                setEditingTransaction(transaction);
+                setShowTransactionModal(true);
+              }}
+              onDelete={handleDeleteTransaction}
+              type="investment"
+              title="Transações de Investimentos (Últimos 30 Dias)"
+            />
+
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Categorias de Investimentos</h2>
               <button
@@ -794,6 +892,15 @@ const loadCards = async () => {
               })}
             </div>
           </div>
+        )}
+
+        {/* Portfolio View */}
+        {activeTab === 'investments' && showPortfolio && (
+          <Portfolio
+            transactions={transactions}
+            categories={categories}
+            onBack={() => setShowPortfolio(false)}
+          />
         )}
 
         {/* Credit Cards Tab */}
@@ -885,7 +992,7 @@ const loadCards = async () => {
         )}
 
         {/* Settings Tab */}
-        {activeTab === 'settings' && (
+        {activeTab === 'settings' && !showCategoriesManager && (
           <div className="space-y-6">
             {/* User Profile */}
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -914,7 +1021,47 @@ const loadCards = async () => {
                 </div>
               </div>
             </div>
+
+            {/* Management Options */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-6">Gerenciamento</h2>
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowCategoriesManager(true)}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <div className="flex items-center space-x-3">
+                    <FolderTree className="w-5 h-5 text-gray-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Categorias</p>
+                      <p className="text-sm text-gray-600">Gerencie todas as suas categorias</p>
+                    </div>
+                  </div>
+                  <ArrowUpRight className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* Categories Manager View */}
+        {activeTab === 'settings' && showCategoriesManager && (
+          <CategoriesManager
+            categories={categories}
+            transactions={transactions}
+            onBack={() => setShowCategoriesManager(false)}
+            onAddCategory={(type) => {
+              setCategoryType(type);
+              setEditingCategory(null);
+              setShowCategoryModal(true);
+            }}
+            onEditCategory={(category, type) => {
+              setEditingCategory(category);
+              setCategoryType(type);
+              setShowCategoryModal(true);
+            }}
+            onDeleteCategory={handleDeleteCategory}
+          />
         )}
       </div>
       
