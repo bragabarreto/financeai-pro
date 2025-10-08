@@ -3,117 +3,12 @@ import { extractTransactions, validateTransactions } from './aiExtractor';
 import { supabase } from '../../supabaseClient';
 
 /**
- * Main import service - FIXED VERSION
- * Handles Brazilian formats and CSV parsing issues
+ * Main import service
+ * Orchestrates file parsing, AI extraction, and data import
  */
 
 /**
- * Convert Brazilian currency format to number
- * @param {String} value - Brazilian currency (e.g., "R$ 1.234,56" or "R$ 1,09")
- * @returns {Number} Numeric value
- */
-export const parseBrazilianCurrency = (value) => {
-  if (typeof value === 'number') return value;
-  if (!value) return 0;
-  
-  // Remove R$, spaces, and quotes
-  let cleaned = value.toString()
-    .replace(/["']/g, '')
-    .replace(/R\$/g, '')
-    .trim();
-  
-  // Check if has both dot and comma (e.g., "1.234,56")
-  if (cleaned.includes('.') && cleaned.includes(',')) {
-    // Remove thousands separator (dot) and replace decimal comma with dot
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-  } 
-  // Check if has only comma (e.g., "1,09")
-  else if (cleaned.includes(',')) {
-    // Replace decimal comma with dot
-    cleaned = cleaned.replace(',', '.');
-  }
-  
-  const number = parseFloat(cleaned);
-  return isNaN(number) ? 0 : number;
-};
-
-/**
- * Convert Brazilian date format to ISO format
- * @param {String} date - Brazilian date (DD/MM/YYYY)
- * @returns {String} ISO date (YYYY-MM-DD)
- */
-export const parseBrazilianDate = (date) => {
-  if (!date) return null;
-  
-  // Remove quotes
-  const cleaned = date.toString().replace(/["']/g, '').trim();
-  
-  // Check if already in ISO format
-  if (cleaned.match(/^\d{4}-\d{2}-\d{2}/)) {
-    return cleaned.split('T')[0];
-  }
-  
-  // Parse DD/MM/YYYY
-  const match = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (match) {
-    const day = match[1].padStart(2, '0');
-    const month = match[2].padStart(2, '0');
-    const year = match[3];
-    return `${year}-${month}-${day}`;
-  }
-  
-  return null;
-};
-
-/**
- * Parse CSV with proper handling of quoted fields
- * @param {String} csvText - CSV content
- * @returns {Array} Parsed rows
- */
-export const parseCSVProperly = (csvText) => {
-  const lines = csvText.split('\n');
-  const result = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    
-    const row = [];
-    let currentField = '';
-    let insideQuotes = false;
-    
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      const nextChar = line[j + 1];
-      
-      if (char === '"') {
-        if (insideQuotes && nextChar === '"') {
-          // Escaped quote
-          currentField += '"';
-          j++; // Skip next quote
-        } else {
-          // Toggle quote state
-          insideQuotes = !insideQuotes;
-        }
-      } else if (char === ',' && !insideQuotes) {
-        // Field separator
-        row.push(currentField.trim());
-        currentField = '';
-      } else {
-        currentField += char;
-      }
-    }
-    
-    // Add last field
-    row.push(currentField.trim());
-    result.push(row);
-  }
-  
-  return result;
-};
-
-/**
- * Process uploaded file and extract transactions - FIXED VERSION
+ * Process uploaded file and extract transactions
  * @param {File} file - The uploaded file
  * @param {Object} options - Processing options
  * @returns {Promise<Object>} Processing result
@@ -125,85 +20,32 @@ export const processImportFile = async (file, options = {}) => {
     throw new Error(validation.error);
   }
 
-  // Read file content
-  const fileContent = await file.text();
+  // Parse file
+  const parseResult = await parseFile(file);
   
-  // Parse CSV properly
-  const rows = parseCSVProperly(fileContent);
+  // Extract transactions using AI
+  const transactions = extractTransactions(parseResult.data, options.fieldMapping);
   
-  if (rows.length < 2) {
-    throw new Error('Arquivo CSV vazio ou inválido');
-  }
-  
-  // Get header
-  const header = rows[0];
-  
-  // Filter only main columns (first 9)
-  const mainColumnCount = Math.min(9, header.length);
-  const mainHeader = header.slice(0, mainColumnCount);
-  
-  // Process data rows
-  const transactions = [];
-  const errors = [];
-  
-  for (let i = 1; i < rows.length; i++) {
-    try {
-      const row = rows[i];
-      
-      // Skip empty rows
-      if (!row[0] || row[0].trim() === '') continue;
-      
-      // Get only main columns
-      const mainRow = row.slice(0, mainColumnCount);
-      
-      // Map to transaction object
-      const transaction = {
-        description: mainRow[0] || '',
-        amount: parseBrazilianCurrency(mainRow[1]),
-        date: parseBrazilianDate(mainRow[2]),
-        category: mainRow[3] || '',
-        payment_method: mainRow[4] || '',
-        type: 'expense', // Default to expense
-        source: 'csv_import'
-      };
-      
-      // Validate required fields
-      if (!transaction.description || transaction.amount === 0 || !transaction.date) {
-        errors.push({
-          row: i + 1,
-          data: mainRow,
-          error: 'Campos obrigatórios faltando (descrição, valor ou data)'
-        });
-        continue;
-      }
-      
-      transactions.push(transaction);
-      
-    } catch (error) {
-      errors.push({
-        row: i + 1,
-        data: rows[i],
-        error: error.message
-      });
-    }
-  }
+  // Validate extracted transactions
+  const validationResult = validateTransactions(transactions);
   
   return {
+    parseResult,
     transactions,
-    errors,
+    validation: validationResult,
     metadata: {
       fileName: file.name,
       fileSize: file.size,
       processedAt: new Date().toISOString(),
-      totalRows: rows.length - 1,
+      totalRows: parseResult.rowCount,
       extractedTransactions: transactions.length,
-      failedRows: errors.length
+      validTransactions: validationResult.validTransactions
     }
   };
 };
 
 /**
- * Import transactions to database - FIXED VERSION
+ * Import transactions to database
  * @param {Array} transactions - Transactions to import
  * @param {String} userId - User ID
  * @param {String} accountId - Account ID
@@ -219,39 +61,25 @@ export const importTransactions = async (transactions, userId, accountId, catego
       // Map category name to ID if available
       const categoryId = categoryMapping[transaction.category] || null;
       
+      // Prepare transaction data
       // Determine the correct account_id or card_id based on payment method
       const finalAccountId = transaction.card_id ? null : (transaction.account_id || accountId);
       const cardId = transaction.card_id || null;
-      
-      // Ensure amount is a valid number
-      const amount = typeof transaction.amount === 'number' 
-        ? transaction.amount 
-        : parseBrazilianCurrency(transaction.amount);
-      
-      // Ensure date is in ISO format
-      const date = transaction.date && transaction.date.match(/^\d{4}-\d{2}-\d{2}/)
-        ? transaction.date
-        : parseBrazilianDate(transaction.date);
-      
-      if (!date) {
-        throw new Error('Data inválida');
-      }
-      
-      if (amount === 0 || isNaN(amount)) {
-        throw new Error('Valor inválido');
-      }
       
       const transactionData = {
         user_id: userId,
         account_id: finalAccountId,
         card_id: cardId,
-        type: transaction.type || 'expense',
+        type: transaction.type,
         description: transaction.description,
-        amount: amount,
+        amount: transaction.amount,
         category: categoryId,
-        date: date,
+        date: transaction.date,
         created_at: new Date().toISOString()
       };
+      
+      // Note: metadata column is not added to avoid schema errors
+      // The database schema does not include a metadata column for transactions
       
       // Insert into database
       const { data, error } = await supabase
@@ -278,7 +106,7 @@ export const importTransactions = async (transactions, userId, accountId, catego
   }
   
   // Update account balance
-  if (importedTransactions.length > 0 && accountId) {
+  if (importedTransactions.length > 0) {
     await updateAccountBalance(accountId, userId);
   }
   
@@ -297,8 +125,6 @@ export const importTransactions = async (transactions, userId, accountId, catego
  * @param {String} userId - User ID
  */
 const updateAccountBalance = async (accountId, userId) => {
-  if (!accountId) return;
-  
   // Get all transactions for this account
   const { data: transactions, error } = await supabase
     .from('transactions')
@@ -319,6 +145,7 @@ const updateAccountBalance = async (accountId, userId) => {
     } else if (t.type === 'expense') {
       balance -= t.amount;
     } else if (t.type === 'investment') {
+      // Investments reduce balance (money moved to investment)
       balance -= t.amount;
     }
   });
@@ -339,12 +166,12 @@ const updateAccountBalance = async (accountId, userId) => {
 export const saveImportHistory = async (userId, importResult) => {
   const historyRecord = {
     user_id: userId,
-    file_name: importResult.metadata?.fileName || 'unknown',
-    file_size: importResult.metadata?.fileSize || 0,
-    total_rows: importResult.metadata?.totalRows || 0,
-    extracted_transactions: importResult.metadata?.extractedTransactions || 0,
-    imported_transactions: importResult.imported || 0,
-    failed_transactions: importResult.failed || 0,
+    file_name: importResult.metadata.fileName,
+    file_size: importResult.metadata.fileSize,
+    total_rows: importResult.metadata.totalRows,
+    extracted_transactions: importResult.metadata.extractedTransactions,
+    imported_transactions: importResult.imported,
+    failed_transactions: importResult.failed,
     import_date: new Date().toISOString(),
     status: importResult.success ? 'completed' : 'partial',
     metadata: importResult
@@ -426,7 +253,7 @@ export const rollbackImport = async (importId, userId) => {
   }
   
   // Update account balances
-  const accountIds = [...new Set(transactions.map(t => t.account_id).filter(Boolean))];
+  const accountIds = [...new Set(transactions.map(t => t.account_id))];
   for (const accountId of accountIds) {
     await updateAccountBalance(accountId, userId);
   }
