@@ -86,7 +86,7 @@ const TransactionList = ({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meio Pgto</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta/Cartão</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Forma de Pagamento</th>
               {type === 'expense' && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pensão</th>
               )}
