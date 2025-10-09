@@ -75,6 +75,24 @@ describe('fileParser', () => {
       expect(result.valid).toBe(true);
     });
 
+    test('should validate PDF files', () => {
+      const file = new File(['test'], 'test.pdf', { type: 'application/pdf' });
+      const result = validateFile(file);
+      expect(result.valid).toBe(true);
+    });
+
+    test('should validate DOC files', () => {
+      const file = new File(['test'], 'test.doc', { type: 'application/msword' });
+      const result = validateFile(file);
+      expect(result.valid).toBe(true);
+    });
+
+    test('should validate DOCX files', () => {
+      const file = new File(['test'], 'test.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const result = validateFile(file);
+      expect(result.valid).toBe(true);
+    });
+
     test('should reject files that are too large', () => {
       const largeContent = 'x'.repeat(11 * 1024 * 1024); // 11MB
       const file = new File([largeContent], 'large.csv', { type: 'text/csv' });
