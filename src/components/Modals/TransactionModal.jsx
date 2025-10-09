@@ -12,7 +12,11 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
     payment_method: '',
     date: new Date().toISOString().split('T')[0],
     origin: '',
-    is_alimony: false
+    is_alimony: false,
+    is_installment: false,
+    installment_count: null,
+    installment_due_dates: [],
+    last_installment_date: null
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,7 +28,11 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
         is_alimony: transaction.is_alimony || false,
         payment_method: transaction.payment_method || '',
         card_id: transaction.card_id || '',
-        account_id: transaction.account_id || ''
+        account_id: transaction.account_id || '',
+        is_installment: transaction.is_installment || false,
+        installment_count: transaction.installment_count || null,
+        installment_due_dates: transaction.installment_due_dates || [],
+        last_installment_date: transaction.last_installment_date || null
       });
     } else {
       // Reset form when opening for new transaction
@@ -38,7 +46,11 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
         payment_method: '',
         date: new Date().toISOString().split('T')[0],
         origin: '',
-        is_alimony: false
+        is_alimony: false,
+        is_installment: false,
+        installment_count: null,
+        installment_due_dates: [],
+        last_installment_date: null
       });
     }
   }, [transaction, show]);
@@ -96,6 +108,40 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
   
   // Encontrar conta principal
   const primaryAccount = accounts.find(acc => acc.is_primary);
+
+  // Helper function to calculate installment dates
+  const calculateInstallmentDates = (startDate, count) => {
+    const dates = [];
+    const date = new Date(startDate);
+    for (let i = 0; i < count; i++) {
+      const installmentDate = new Date(date);
+      installmentDate.setMonth(date.getMonth() + i);
+      dates.push(installmentDate.toISOString().split('T')[0]);
+    }
+    return dates;
+  };
+
+  // Update installment dates when count or start date changes
+  const handleInstallmentChange = (count) => {
+    const numCount = parseInt(count) || 0;
+    if (numCount > 0 && formData.date) {
+      const dates = calculateInstallmentDates(formData.date, numCount);
+      const lastDate = dates[dates.length - 1];
+      setFormData({
+        ...formData,
+        installment_count: numCount,
+        installment_due_dates: dates,
+        last_installment_date: lastDate
+      });
+    } else {
+      setFormData({
+        ...formData,
+        installment_count: null,
+        installment_due_dates: [],
+        last_installment_date: null
+      });
+    }
+  };
 
   if (!show) return null;
 
@@ -267,10 +313,73 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
             <input
               type="date"
               value={formData.date}
-              onChange={(e) => setFormData({...formData, date: e.target.value})}
+              onChange={(e) => {
+                const newDate = e.target.value;
+                setFormData({...formData, date: newDate});
+                // Recalculate installment dates if installment is active
+                if (formData.is_installment && formData.installment_count) {
+                  const dates = calculateInstallmentDates(newDate, formData.installment_count);
+                  setFormData({
+                    ...formData,
+                    date: newDate,
+                    installment_due_dates: dates,
+                    last_installment_date: dates[dates.length - 1]
+                  });
+                }
+              }}
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+          </div>
+
+          {/* Campo de Transação Parcelada */}
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="is_installment"
+                checked={formData.is_installment}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  setFormData({
+                    ...formData,
+                    is_installment: isChecked,
+                    installment_count: isChecked ? formData.installment_count : null,
+                    installment_due_dates: isChecked ? formData.installment_due_dates : [],
+                    last_installment_date: isChecked ? formData.last_installment_date : null
+                  });
+                }}
+                className="mr-3 w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="is_installment" className="flex items-center cursor-pointer">
+                <span className="text-sm font-medium">Transação Parcelada</span>
+              </label>
+            </div>
+            {formData.is_installment && (
+              <div className="mt-3 space-y-3 ml-7">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Quantidade de Parcelas
+                  </label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="48"
+                    value={formData.installment_count || ''}
+                    onChange={(e) => handleInstallmentChange(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Ex: 12"
+                  />
+                </div>
+                {formData.installment_count > 0 && formData.last_installment_date && (
+                  <div className="text-xs text-blue-700 bg-blue-100 p-2 rounded">
+                    <p><strong>Data da primeira parcela:</strong> {new Date(formData.date).toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Data da última parcela:</strong> {new Date(formData.last_installment_date).toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Total de parcelas:</strong> {formData.installment_count}x de R$ {(formData.amount / formData.installment_count).toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Campo de Pensão Alimentícia - Apenas para despesas */}

@@ -149,6 +149,70 @@ export const extractTransactionsFromFile = (fileContent, format = 'csv') => {
 };
 
 /**
+ * Detecta se uma transação é parcelada baseado na descrição
+ * @param {string} description - Descrição da transação
+ * @returns {Object|null} Informações de parcelamento ou null
+ */
+const detectInstallment = (description) => {
+  if (!description) return null;
+  
+  const lowerDesc = description.toLowerCase();
+  
+  // Padrões comuns de parcelamento: "12x", "12/24", "parcela 1 de 12", etc
+  const patterns = [
+    /(\d+)\s*x\s*de\s*(\d+)/i,  // "1x de 12", "01x de 12"
+    /(\d+)\/(\d+)/,              // "1/12", "01/12"
+    /parcela\s*(\d+)\s*de\s*(\d+)/i, // "parcela 1 de 12"
+    /parc\s*(\d+)\/(\d+)/i,      // "parc 1/12"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = description.match(pattern);
+    if (match) {
+      const totalInstallments = parseInt(match[2]);
+      if (totalInstallments > 1 && totalInstallments <= 48) {
+        return {
+          is_installment: true,
+          installment_count: totalInstallments
+        };
+      }
+    }
+  }
+  
+  // Padrão simples: apenas "12x" sem indicar parcela atual
+  const simplePattern = /(\d+)\s*x/i;
+  const simpleMatch = description.match(simplePattern);
+  if (simpleMatch) {
+    const count = parseInt(simpleMatch[1]);
+    if (count > 1 && count <= 48) {
+      return {
+        is_installment: true,
+        installment_count: count
+      };
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Calcula datas de parcelas
+ * @param {string} startDate - Data inicial (ISO format)
+ * @param {number} count - Número de parcelas
+ * @returns {Array} Array de datas em formato ISO
+ */
+const calculateInstallmentDates = (startDate, count) => {
+  const dates = [];
+  const date = new Date(startDate);
+  for (let i = 0; i < count; i++) {
+    const installmentDate = new Date(date);
+    installmentDate.setMonth(date.getMonth() + i);
+    dates.push(installmentDate.toISOString().split('T')[0]);
+  }
+  return dates;
+};
+
+/**
  * Extrai transações de arquivo CSV
  * @param {string} csvContent - Conteúdo CSV
  * @returns {Array} Lista de transações
@@ -167,19 +231,60 @@ const extractFromCSV = (csvContent) => {
   const descIndex = header.findIndex(h => h.includes('descri') || h.includes('desc') || h.includes('hist'));
   const amountIndex = header.findIndex(h => h.includes('valor') || h.includes('amount') || h.includes('value'));
   const typeIndex = header.findIndex(h => h.includes('tipo') || h.includes('type'));
+  
+  // Mapear colunas de parcelamento (se existirem)
+  const installmentIndex = header.findIndex(h => h.includes('parcelado') || h.includes('installment'));
+  const installmentCountIndex = header.findIndex(h => h.includes('parcelas') || h.includes('installments'));
 
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(',').map(v => v.trim());
     
     if (values.length < header.length) continue;
 
+    const date = dateIndex >= 0 ? parseDate(values[dateIndex]) : new Date().toISOString().split('T')[0];
+    const description = descIndex >= 0 ? values[descIndex].replace(/['"]/g, '') : '';
+    const amount = amountIndex >= 0 ? parseFloat(values[amountIndex].replace(/[^\d.-]/g, '')) : 0;
+    
     const transaction = {
-      date: dateIndex >= 0 ? parseDate(values[dateIndex]) : new Date().toISOString().split('T')[0],
-      description: descIndex >= 0 ? values[descIndex].replace(/['"]/g, '') : '',
-      amount: amountIndex >= 0 ? parseFloat(values[amountIndex].replace(/[^\d.-]/g, '')) : 0,
+      date,
+      description,
+      amount,
       type: typeIndex >= 0 ? parseType(values[typeIndex]) : 'expense',
-      origin: 'import'
+      origin: 'import',
+      is_installment: false,
+      installment_count: null,
+      installment_due_dates: [],
+      last_installment_date: null
     };
+    
+    // Verificar se há informação explícita de parcelamento nas colunas
+    if (installmentIndex >= 0 && values[installmentIndex]) {
+      const isInstallmentValue = values[installmentIndex].toLowerCase();
+      transaction.is_installment = isInstallmentValue === 'sim' || isInstallmentValue === 'true' || isInstallmentValue === '1';
+    }
+    
+    if (installmentCountIndex >= 0 && values[installmentCountIndex]) {
+      const count = parseInt(values[installmentCountIndex]);
+      if (!isNaN(count) && count > 1) {
+        transaction.installment_count = count;
+        transaction.is_installment = true;
+      }
+    }
+    
+    // Se não há informação explícita, tentar detectar pela descrição
+    if (!transaction.is_installment) {
+      const installmentInfo = detectInstallment(description);
+      if (installmentInfo) {
+        transaction.is_installment = installmentInfo.is_installment;
+        transaction.installment_count = installmentInfo.installment_count;
+      }
+    }
+    
+    // Calcular datas de parcelas se for parcelado
+    if (transaction.is_installment && transaction.installment_count > 0) {
+      transaction.installment_due_dates = calculateInstallmentDates(date, transaction.installment_count);
+      transaction.last_installment_date = transaction.installment_due_dates[transaction.installment_due_dates.length - 1];
+    }
 
     if (transaction.description && transaction.amount > 0) {
       transactions.push(transaction);
