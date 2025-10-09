@@ -53,12 +53,25 @@ export const parseBrazilianDate = (date) => {
     return cleaned.split('T')[0];
   }
   
-  // Parse DD/MM/YYYY
-  const match = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (match) {
-    const day = match[1].padStart(2, '0');
-    const month = match[2].padStart(2, '0');
-    const year = match[3];
+  // Parse DD/MM/YYYY or DD-MM-YYYY
+  const matchFull = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (matchFull) {
+    const day = matchFull[1].padStart(2, '0');
+    const month = matchFull[2].padStart(2, '0');
+    let year = matchFull[3];
+    // Handle 2-digit year
+    if (year.length === 2) {
+      year = `20${year}`;
+    }
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Parse DD/MM without year (use current year)
+  const matchShort = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  if (matchShort) {
+    const day = matchShort[1].padStart(2, '0');
+    const month = matchShort[2].padStart(2, '0');
+    const year = new Date().getFullYear();
     return `${year}-${month}-${day}`;
   }
   
@@ -205,10 +218,24 @@ export const importTransactions = async (transactions, userId, accountId, catego
         ? transaction.amount 
         : parseBrazilianCurrency(transaction.amount);
       
-      // Ensure date is in ISO format
-      const date = transaction.date && transaction.date.match(/^\d{4}-\d{2}-\d{2}/)
-        ? transaction.date
-        : parseBrazilianDate(transaction.date);
+      // Ensure date is in ISO format (YYYY-MM-DD only, no time component)
+      let date = transaction.date;
+      
+      // If it's a Date object, convert to ISO string without timezone issues
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        date = `${year}-${month}-${day}`;
+      } 
+      // If it's already in ISO format, extract just the date part (remove time if present)
+      else if (date && date.match(/^\d{4}-\d{2}-\d{2}/)) {
+        date = date.split('T')[0];
+      } 
+      // Otherwise, try to parse Brazilian format
+      else {
+        date = parseBrazilianDate(date);
+      }
       
       if (!date) {
         throw new Error('Data inválida');

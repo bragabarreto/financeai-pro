@@ -155,18 +155,18 @@ const parseAmount = (amountStr) => {
  * Parse date from SMS (Brazilian DD/MM format)
  * @param {string} dateStr - Date string in DD/MM or DD/MM/YYYY format
  * @param {string} timeStr - Time string (optional, HH:MM format)
- * @returns {string} ISO date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+ * @returns {string|null} ISO date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS), or null if not found
  */
 const parseDate = (dateStr, timeStr = '') => {
   if (!dateStr) {
-    return new Date().toISOString().split('T')[0];
+    return null; // Return null instead of current date to allow user to fill manually
   }
   
   const now = new Date();
   const currentYear = now.getFullYear();
   
-  // Parse DD/MM or DD/MM/YYYY
-  const matchWithYear = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  // Parse DD/MM/YYYY or DD-MM-YYYY
+  const matchWithYear = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if (matchWithYear) {
     const day = matchWithYear[1].padStart(2, '0');
     const month = matchWithYear[2].padStart(2, '0');
@@ -184,8 +184,8 @@ const parseDate = (dateStr, timeStr = '') => {
     return `${year}-${month}-${day}`;
   }
   
-  // Parse DD/MM (without year)
-  const match = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
+  // Parse DD/MM or DD-MM (without year)
+  const match = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})/);
   if (match) {
     const day = match[1].padStart(2, '0');
     const month = match[2].padStart(2, '0');
@@ -198,7 +198,8 @@ const parseDate = (dateStr, timeStr = '') => {
     return `${currentYear}-${month}-${day}`;
   }
   
-  return new Date().toISOString().split('T')[0];
+  // Return null if no date pattern matched (let user fill manually)
+  return null;
 };
 
 /**

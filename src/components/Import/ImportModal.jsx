@@ -104,14 +104,28 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts);
       }
 
-      // Map categories
-      const transactionsWithCategoryMapping = transactions.map(t => {
+      // Map categories with pattern learning
+      const transactionsWithCategoryMapping = await Promise.all(transactions.map(async (t) => {
         const categoryList = Object.values(categories[t.type] || []);
         
-        // Try AI suggestion first, then fallback to pattern matching
+        // Try AI suggestion first
         let matchedCategory = null;
+        let suggestionSource = null;
+        
         if (t.aiSuggestedCategory) {
           matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
+          suggestionSource = 'ai';
+        }
+        
+        // If no AI suggestion, try pattern learning from history
+        if (!matchedCategory && user && user.id) {
+          const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
+          const historyMatch = await suggestCategoryFromHistory(user.id, t.description);
+          
+          if (historyMatch && historyMatch.confidence > 0.5) {
+            matchedCategory = categoryList.find(c => c.id === historyMatch.categoryId);
+            suggestionSource = 'history';
+          }
         }
         
         // Auto-assign account or card based on payment method
@@ -132,11 +146,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           ...t,
           categoryId: matchedCategory?.id || null,
           isSuggestion: !!matchedCategory,
+          suggestionSource: suggestionSource, // 'ai', 'history', or null
           manuallyEdited: false,
           account_id: defaultAccountId,
           card_id: defaultCardId
         };
-      });
+      }));
 
       setProcessResult({
         transactions: transactionsWithCategoryMapping,
@@ -219,11 +234,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           ...t,
           categoryId: matchedCategory?.id || null,
           isSuggestion: !!matchedCategory,
+          suggestionSource: suggestionSource, // 'ai', 'history', or null
           manuallyEdited: false,
           account_id: defaultAccountId,
           card_id: defaultCardId
         };
-      });
+      }));
 
       const validation = {
         valid: true,
@@ -321,6 +337,38 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           categoryList,
           cards,
           accounts
+        );
+      }
+      
+      // Apply pattern learning to transactions without AI suggestions
+      if (user && user.id) {
+        const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
+        
+        transactionsWithCategoryMapping = await Promise.all(
+          transactionsWithCategoryMapping.map(async (t) => {
+            // Skip if already has a category from AI or file
+            if (t.categoryId) {
+              return t;
+            }
+            
+            // Try pattern learning
+            const categoryList = Object.values(categories[t.type] || []);
+            const historyMatch = await suggestCategoryFromHistory(user.id, t.description);
+            
+            if (historyMatch && historyMatch.confidence > 0.5) {
+              const matchedCategory = categoryList.find(c => c.id === historyMatch.categoryId);
+              if (matchedCategory) {
+                return {
+                  ...t,
+                  categoryId: matchedCategory.id,
+                  isSuggestion: true,
+                  suggestionSource: 'history'
+                };
+              }
+            }
+            
+            return t;
+          })
         );
       }
       
