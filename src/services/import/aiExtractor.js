@@ -146,6 +146,14 @@ export const parseDate = (dateString) => {
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
   
+  // Try DD/MM format without year (use current year)
+  const brShortFormat = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  if (brShortFormat) {
+    const [, day, month] = brShortFormat;
+    const currentYear = new Date().getFullYear();
+    return `${currentYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
   // Try to parse as JS Date
   const date = new Date(dateStr);
   if (!isNaN(date.getTime())) {
@@ -261,8 +269,8 @@ export const categorizeTransaction = (description) => {
     return 'compras';
   }
   
-  // Food & Dining
-  if (/(restaurante|lanchonete|padaria|mercado|supermercado|ifood|uber\s*eats|rappi)/i.test(desc)) {
+  // Food & Dining - Enhanced to better detect restaurants and food establishments
+  if (/(restaurante|lanchonete|padaria|mercado|supermercado|ifood|uber\s*eats|rappi|brasilerie|pizzaria|bar|cafe|cafeteria|lanches|hamburgueria|confeitaria|doceria|sorveteria|food)/i.test(desc)) {
     return 'alimentacao';
   }
   
@@ -277,7 +285,7 @@ export const categorizeTransaction = (description) => {
   }
   
   // Health
-  if (/(farmacia|farmácia|hospital|clinica|clínica|medico|médico|plano\s*de?\s*saude|plano\s*de?\s*saúde)/i.test(desc)) {
+  if (/(farmacia|farmácia|hospital|clinica|clínica|medico|médico|plano\s*de?\s*saude|plano\s*de?\s*saúde|drogaria)/i.test(desc)) {
     return 'saude';
   }
   
