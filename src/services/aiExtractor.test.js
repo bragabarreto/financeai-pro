@@ -215,5 +215,79 @@ describe('aiExtractor Service', () => {
       expect(result[0].categoryConfidence).toBeGreaterThan(0);
       expect(result[0].categoryConfidence).toBeLessThanOrEqual(1);
     });
+
+    it('deve sugerir apenas categorias registradas pelo usuário', async () => {
+      const mockCategories = [
+        { id: '1', name: 'Supermercado', type: 'expense' },
+        { id: '2', name: 'Transporte', type: 'expense' }
+      ];
+
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockEq = jest.fn().mockResolvedValue({ data: mockCategories, error: null });
+
+      supabase.from = jest.fn().mockReturnValue({
+        select: mockSelect,
+        eq: mockEq
+      });
+
+      mockSelect.mockReturnValue({
+        eq: mockEq
+      });
+
+      const transactions = [
+        { description: 'Compra no supermercado Extra', amount: 150, type: 'expense' },
+        { description: 'Viagem de transporte', amount: 25, type: 'expense' },
+        { description: 'Restaurante italiano', amount: 80, type: 'expense' }
+      ];
+
+      const result = await categorizeTransactions(transactions, 'user123');
+
+      // Primeira transação deve sugerir "Supermercado" pois o nome está na descrição
+      expect(result[0].suggestedCategory).toBe('1');
+      expect(result[0].category).toBe('1');
+
+      // Segunda transação deve sugerir "Transporte" pois o nome está na descrição
+      expect(result[1].suggestedCategory).toBe('2');
+      expect(result[1].category).toBe('2');
+
+      // Terceira transação NÃO deve sugerir nada pois "Restaurante" não está registrada
+      expect(result[2].suggestedCategory).toBeNull();
+      expect(result[2].category).toBeNull();
+      expect(result[2].categoryConfidence).toBe(0);
+    });
+
+    it('deve categorizar baseado no nome exato da categoria', async () => {
+      const mockCategories = [
+        { id: 'cat1', name: 'Alimentação', type: 'expense' },
+        { id: 'cat2', name: 'Transporte Uber', type: 'expense' }
+      ];
+
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockEq = jest.fn().mockResolvedValue({ data: mockCategories, error: null });
+
+      supabase.from = jest.fn().mockReturnValue({
+        select: mockSelect,
+        eq: mockEq
+      });
+
+      mockSelect.mockReturnValue({
+        eq: mockEq
+      });
+
+      const transactions = [
+        { description: 'Gasto com alimentação', amount: 100, type: 'expense' },
+        { description: 'Uber para casa', amount: 20, type: 'expense' }
+      ];
+
+      const result = await categorizeTransactions(transactions, 'user123');
+
+      // Deve sugerir "Alimentação" pela correspondência de texto
+      expect(result[0].suggestedCategory).toBe('cat1');
+      expect(result[0].categoryConfidence).toBeGreaterThan(0.5);
+
+      // Deve sugerir "Transporte Uber" pela correspondência de "uber"
+      expect(result[1].suggestedCategory).toBe('cat2');
+      expect(result[1].categoryConfidence).toBeGreaterThan(0);
+    });
   });
 });
