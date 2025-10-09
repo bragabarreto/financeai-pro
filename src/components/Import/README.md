@@ -9,7 +9,10 @@ O módulo de importação de dados permite que os usuários importem transaçõe
 ### 1. Suporte a Múltiplos Formatos
 - **CSV**: Arquivos de texto separados por vírgula
 - **XLS/XLSX**: Planilhas do Microsoft Excel
-- **PDF**: Extratos bancários e faturas em PDF (funcionalidade básica)
+- **PDF**: Extratos bancários e faturas em PDF (requer conversão manual)
+- **DOC/DOCX**: Documentos Word (requer conversão manual)
+
+**Nota:** Para PDFs e DOCs, recomenda-se converter para CSV/Excel ou usar a função "SMS/Texto" para colar o conteúdo extraído manualmente.
 
 ### 2. Extração Inteligente com IA
 O sistema utiliza algoritmos de IA para:
@@ -38,8 +41,9 @@ O sistema utiliza algoritmos de IA para:
 
 ### Passo 1: Upload do Arquivo
 1. Clique no botão "Importar" no cabeçalho da aplicação
-2. Selecione um arquivo CSV, XLS, XLSX ou PDF
+2. Selecione um arquivo CSV, XLS, XLSX, PDF ou DOC
 3. Tamanho máximo: 10MB
+4. Formatos recomendados: CSV e Excel (XLS/XLSX) para melhor compatibilidade
 
 ### Passo 2: Revisão dos Dados
 1. O sistema processará o arquivo e extrairá as transações
@@ -128,10 +132,14 @@ O sistema categoriza automaticamente as transações baseado em palavras-chave:
 
 ## Limitações Conhecidas
 
-1. **PDF**: A extração de PDF é básica. Para melhor suporte, considere integração com pdf.js ou backend
+1. **PDF e DOC**: A extração de PDF e DOC é limitada no browser. Para melhor suporte:
+   - Converta arquivos PDF/DOC para CSV ou Excel antes de importar
+   - Use a opção "SMS/Texto" para colar o conteúdo extraído manualmente
+   - Considere integração com pdf.js ou mammoth.js para extração automática (futuro)
 2. **Idioma**: Otimizado para português brasileiro
 3. **Categorização**: Baseada em regras simples, pode ser melhorada com ML
 4. **Tamanho**: Limite de 10MB por arquivo
+5. **Tratamento de Erros**: Sistema detecta arquivos corrompidos e exibe mensagens amigáveis
 
 ## Melhorias Futuras
 
