@@ -8,13 +8,13 @@ import { supabase } from '../supabaseClient';
 // Palavras-chave para categorização por tipo de transação
 const KEYWORDS_BY_TYPE = {
   expense: {
-    alimentacao: ['restaurante', 'lanchonete', 'food', 'ifood', 'uber eats', 'padaria', 'mercado', 'supermercado'],
-    transporte: ['uber', '99', 'taxi', 'combustivel', 'gasolina', 'estacionamento', 'pedagio'],
+    alimentacao: ['restaurante', 'lanchonete', 'food', 'ifood', 'uber eats', 'padaria', 'mercado', 'supermercado', 'brasilerie', 'pizzaria', 'bar', 'cafe', 'cafeteria', 'lanches', 'hamburgueria', 'confeitaria', 'doceria', 'sorveteria'],
+    transporte: ['uber', '99', 'taxi', 'combustivel', 'gasolina', 'estacionamento', 'pedagio', 'posto'],
     moradia: ['aluguel', 'condominio', 'iptu', 'agua', 'luz', 'energia', 'gas'],
-    saude: ['farmacia', 'medico', 'hospital', 'clinica', 'consulta', 'plano de saude'],
-    educacao: ['escola', 'curso', 'faculdade', 'universidade', 'livro'],
-    lazer: ['cinema', 'teatro', 'show', 'streaming', 'netflix', 'spotify'],
-    vestuario: ['roupa', 'calcado', 'vestuario', 'loja'],
+    saude: ['farmacia', 'medico', 'hospital', 'clinica', 'consulta', 'plano de saude', 'drogaria'],
+    educacao: ['escola', 'curso', 'faculdade', 'universidade', 'livro', 'livraria'],
+    lazer: ['cinema', 'teatro', 'show', 'streaming', 'netflix', 'spotify', 'ingresso'],
+    vestuario: ['roupa', 'calcado', 'vestuario', 'loja', 'magazine'],
     telefone: ['telefone', 'celular', 'internet', 'tim', 'vivo', 'claro', 'oi'],
   },
   income: {

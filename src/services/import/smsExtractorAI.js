@@ -77,6 +77,29 @@ const extractCardDigits = (text) => {
 };
 
 /**
+ * Extract card last digits from SMS
+ * @param {string} text - SMS text
+ * @returns {string|null} Last 4 digits or null
+ */
+const extractCardDigits = (text) => {
+  const patterns = [
+    /final\s+(\d{4})/i,
+    /cart[aã]o\s+(?:final\s+)?(\d{4})/i,
+    /\*{4}\s*(\d{4})/,
+    /(\d{4})(?:\s*$|\s+[^0-9])/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+};
+
+/**
  * Extract transaction data from SMS using AI
  * @param {string} smsText - SMS text
  * @param {Object} aiConfig - AI configuration with provider and apiKey
@@ -108,7 +131,7 @@ Cartões cadastrados (últimos 4 dígitos): ${cardDigitsList.length > 0 ? cardDi
 
 Retorne APENAS um objeto JSON válido com os seguintes campos:
 {
-  "description": "descrição do estabelecimento ou beneficiário",
+  "description": "descrição do estabelecimento ou beneficiário (extraia o nome do estabelecimento sem prefixos ou sufixos como 'em', 'no', etc.)",
   "amount": valor numérico da transação,
   "date": "data no formato YYYY-MM-DD",
   "type": "expense" ou "income" ou "investment",
@@ -116,16 +139,20 @@ Retorne APENAS um objeto JSON válido com os seguintes campos:
   "card_last_digits": "últimos 4 dígitos do cartão se mencionado, ou null",
   "card_id": "ID do cartão se os dígitos corresponderem a um cartão cadastrado, ou null",
   "installments": número de parcelas se mencionado ou 1,
-  "confidence": score de confiança de 0 a 100
+  "confidence": score de confiança de 0 a 100,
+  "bank_name": "nome do banco remetente do SMS (CAIXA, Nubank, etc.) ou null"
 }
 
 IMPORTANTE:
+- Extraia o nome do estabelecimento de forma limpa (ex: "LA BRASILERIE" em vez de "em LA BRASILERIE")
+- Para estabelecimentos de alimentação (restaurantes, padarias, lanchonetes, etc.), use categoria "alimentacao"
 - Se os últimos 4 dígitos do cartão corresponderem a algum dos cartões cadastrados, use o card_id correspondente
 - Para PIX recebido, type deve ser "income"
 - Para PIX enviado ou compras, type deve ser "expense"
 - Valores devem ser numéricos (sem R$ ou formatação)
 - Datas devem estar no formato YYYY-MM-DD
-- Se a data tiver apenas DD/MM, use o ano atual
+- Se a data tiver apenas DD/MM, use o ano atual (${new Date().getFullYear()})
+- Datas no formato DD/MM significam dia/mês (ex: 09/10 = 9 de outubro, não 10 de setembro)
 - Retorne APENAS o JSON, sem texto adicional`;
 
   try {
@@ -187,20 +214,28 @@ IMPORTANTE:
 const extractFromSMSBasic = (smsText, cards = []) => {
   const text = smsText.trim();
   
+  // Extract bank name
+  const bankMatch = text.match(/^(CAIXA|CEF|Nubank|Nu|Banco\s+do\s+Brasil|BB|Bradesco|Itau|Itaú|Santander|Inter)/i);
+  const bankName = bankMatch ? bankMatch[1].toUpperCase() : null;
+  
   // Extract amount
   const amountMatch = text.match(/R\$?\s*([\d.,\s]+?)(?:\s+em|\s+\d{1,2}\/|$)/);
   const amount = amountMatch ? parseAmount(amountMatch[1]) : 0;
   
-  // Extract date
+  // Extract date (DD/MM format is standard in Brazil)
   const dateMatch = text.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
   const date = dateMatch ? parseDate(dateMatch[1]) : parseDate(null);
   
-  // Extract description
+  // Extract description - improved patterns to better extract establishment names
   let description = 'Transação';
   const descPatterns = [
+    // CAIXA format: "Compra aprovada LA BRASILERIE R$"
+    /Compra\s+aprovada\s+(?:em\s+)?([A-Z][A-Z\s]+?)(?:\s+R\$|\s+\d{1,2}\/)/i,
+    // Generic: "em ESTABELECIMENTO R$"
     /(?:em|no)\s+([A-Z][A-Z\s]+?)(?:\s+R\$|\s+\d{1,2}\/)/i,
-    /aprovada\s+(?:em\s+)?([A-Z][A-Z\s]+?)(?:\s+R\$)/i,
+    // PIX: "para NOME"
     /para\s+([A-Z][A-Za-z\s]+?)(?:\s+em|\s+R\$)/i,
+    // PIX received: "de NOME"
     /de\s+([A-Z][A-Za-z\s]+?)(?:\s+em|\s+R\$)/i
   ];
   
@@ -240,18 +275,30 @@ const extractFromSMSBasic = (smsText, cards = []) => {
   const installmentsMatch = text.match(/em\s+(\d+)\s+vezes/i);
   const installments = installmentsMatch ? parseInt(installmentsMatch[1]) : 1;
   
+  // Categorize based on description
+  let category = 'outros';
+  const descLower = description.toLowerCase();
+  if (/(restaurante|lanchonete|padaria|brasilerie|pizzaria|bar|cafe|food)/i.test(descLower)) {
+    category = 'alimentacao';
+  } else if (/(uber|99|taxi|posto|gasolina)/i.test(descLower)) {
+    category = 'transporte';
+  } else if (/(farmacia|hospital|clinica|drogaria)/i.test(descLower)) {
+    category = 'saude';
+  }
+  
   return {
     description,
     amount,
     date,
     type,
-    category: 'outros',
+    category,
     card_last_digits: cardDigits,
     card_id: cardId,
     installments,
     confidence: 60,
     source: 'basic',
-    rawText: text
+    rawText: text,
+    bank_name: bankName
   };
 };
 
