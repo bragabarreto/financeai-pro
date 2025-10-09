@@ -264,6 +264,17 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
     try {
       const result = await processImportFile(file);
+      
+      // Check if any transactions were extracted
+      if (!result.transactions || result.transactions.length === 0) {
+        setError(
+          'Não foi possível extrair transações do arquivo. ' +
+          'Verifique se o arquivo contém dados no formato correto (colunas: data, descrição, valor).'
+        );
+        setLoading(false);
+        return;
+      }
+      
       setProcessResult(result);
       
       // Map category names to IDs and mark auto-categorized items as suggestions
@@ -316,7 +327,20 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       setEditingTransactions(transactionsWithCategoryMapping);
       setStep(2);
     } catch (err) {
-      setError(err.message || 'Erro ao processar arquivo');
+      console.error('File processing error:', err);
+      
+      // Provide user-friendly error messages
+      let errorMessage = err.message || 'Erro ao processar arquivo';
+      
+      if (errorMessage.includes('PDF') || errorMessage.includes('DOC')) {
+        errorMessage = err.message; // Use the specific message for PDF/DOC
+      } else if (errorMessage.includes('Arquivo vazio')) {
+        errorMessage = 'O arquivo está vazio ou corrompido. Tente outro arquivo.';
+      } else if (errorMessage.includes('parse') || errorMessage.includes('processar')) {
+        errorMessage = 'Erro ao ler o arquivo. Verifique se o arquivo não está corrompido e está em um formato válido.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -515,7 +539,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 >
                   <FileText className="w-8 h-8 mx-auto mb-2 text-blue-600" />
                   <h3 className="font-semibold">Arquivo</h3>
-                  <p className="text-sm text-gray-600 mt-1">CSV, Excel, PDF</p>
+                  <p className="text-sm text-gray-600 mt-1">CSV, Excel, PDF, DOC</p>
                 </button>
                 
                 <button
@@ -554,11 +578,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       Selecione um arquivo para importar
                     </h3>
                     <p className="text-gray-600 mb-4">
-                      Formatos suportados: CSV, XLS, XLSX, PDF
+                      Formatos suportados: CSV, XLS, XLSX, PDF, DOC
                     </p>
                     <input
                       type="file"
-                      accept=".csv,.xls,.xlsx,.pdf"
+                      accept=".csv,.xls,.xlsx,.pdf,.doc,.docx"
                       onChange={handleFileSelect}
                       className="hidden"
                       id="file-upload"
@@ -599,7 +623,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
                   <li>Use arquivos CSV ou Excel com cabeçalhos claros</li>
                   <li>Certifique-se de que as colunas incluam: data, descrição e valor</li>
-                  <li>Para PDFs, a extração pode exigir revisão manual</li>
+                  <li>PDFs e DOCs requerem conversão para CSV/Excel ou uso de SMS/Texto</li>
                   <li>Tamanho máximo do arquivo: 10MB</li>
                 </ul>
               </div>

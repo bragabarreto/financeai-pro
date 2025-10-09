@@ -125,67 +125,43 @@ export const processImportFile = async (file, options = {}) => {
     throw new Error(validation.error);
   }
 
-  // Read file content
-  const fileContent = await file.text();
+  // Parse file using the appropriate parser
+  const parseResult = await parseFile(file);
   
-  // Parse CSV properly
-  const rows = parseCSVProperly(fileContent);
+  const { data: parsedData, fileType } = parseResult;
   
-  if (rows.length < 2) {
-    throw new Error('Arquivo CSV vazio ou inválido');
-  }
-  
-  // Get header
-  const header = rows[0];
-  
-  // Filter only main columns (first 9)
-  const mainColumnCount = Math.min(9, header.length);
-  const mainHeader = header.slice(0, mainColumnCount);
-  
-  // Process data rows
-  const transactions = [];
+  // Handle different file types
+  let transactions = [];
   const errors = [];
   
-  for (let i = 1; i < rows.length; i++) {
+  if (fileType === 'csv' || fileType === 'excel') {
+    // Process tabular data (CSV or Excel)
+    if (!Array.isArray(parsedData) || parsedData.length === 0) {
+      throw new Error('Arquivo vazio ou sem dados válidos');
+    }
+    
+    // Use AI extractor to intelligently extract transactions
     try {
-      const row = rows[i];
+      const { extractTransactions } = await import('./aiExtractor');
+      const extracted = extractTransactions(parsedData);
       
-      // Skip empty rows
-      if (!row[0] || row[0].trim() === '') continue;
-      
-      // Get only main columns
-      const mainRow = row.slice(0, mainColumnCount);
-      
-      // Map to transaction object
-      const transaction = {
-        description: mainRow[0] || '',
-        amount: parseBrazilianCurrency(mainRow[1]),
-        date: parseBrazilianDate(mainRow[2]),
-        category: mainRow[3] || '',
-        payment_method: mainRow[4] || '',
-        type: 'expense', // Default to expense
-        source: 'csv_import'
-      };
-      
-      // Validate required fields
-      if (!transaction.description || transaction.amount === 0 || !transaction.date) {
-        errors.push({
-          row: i + 1,
-          data: mainRow,
-          error: 'Campos obrigatórios faltando (descrição, valor ou data)'
-        });
-        continue;
+      if (!extracted || extracted.length === 0) {
+        throw new Error('Não foi possível extrair transações do arquivo. Verifique o formato dos dados.');
       }
       
-      transactions.push(transaction);
-      
+      transactions = extracted;
     } catch (error) {
-      errors.push({
-        row: i + 1,
-        data: rows[i],
-        error: error.message
-      });
+      throw new Error(`Erro ao extrair transações: ${error.message}`);
     }
+  } else if (fileType === 'pdf' || fileType === 'doc') {
+    // For PDF and DOC, we currently return placeholder
+    // These formats require more sophisticated parsing (pdf.js, mammoth.js)
+    throw new Error(
+      `Arquivos ${fileType.toUpperCase()} requerem processamento manual no momento. ` +
+      'Por favor, converta para CSV ou Excel, ou use a opção "SMS/Texto" para colar o conteúdo extraído.'
+    );
+  } else {
+    throw new Error(`Tipo de arquivo não suportado: ${fileType}`);
   }
   
   return {
@@ -194,8 +170,9 @@ export const processImportFile = async (file, options = {}) => {
     metadata: {
       fileName: file.name,
       fileSize: file.size,
+      fileType: fileType,
       processedAt: new Date().toISOString(),
-      totalRows: rows.length - 1,
+      totalRows: parsedData.length || 0,
       extractedTransactions: transactions.length,
       failedRows: errors.length
     }
