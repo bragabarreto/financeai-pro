@@ -21,6 +21,22 @@ describe('SMS Extractor Service', () => {
       expect(result.type).toBe('expense');
       expect(result.payment_method).toBe('credit_card');
       expect(result.origin).toBe('sms_import');
+      expect(result.bank_name).toBe('CAIXA');
+      expect(result.card_last_digits).toBe('6539');
+    });
+
+    it('deve extrair transação do formato CAIXA com LA BRASILERIE', () => {
+      const sms = 'CAIXA: Compra aprovada LA BRASILERIE R$ 47,20 09/10 as 06:49, ELO final 1527';
+      const result = extractFromSMS(sms);
+
+      expect(result).not.toBeNull();
+      expect(result.description).toBe('LA BRASILERIE');
+      expect(result.amount).toBe(47.20);
+      expect(result.type).toBe('expense');
+      expect(result.payment_method).toBe('credit_card');
+      expect(result.date).toBe('2025-10-09T06:49:00'); // With time
+      expect(result.bank_name).toBe('CAIXA');
+      expect(result.card_last_digits).toBe('1527');
     });
 
     it('deve extrair transação do formato CAIXA com parcelamento', () => {
@@ -33,6 +49,8 @@ describe('SMS Extractor Service', () => {
       expect(result.type).toBe('expense');
       expect(result.payment_method).toBe('credit_card');
       expect(result.origin).toBe('sms_import');
+      expect(result.bank_name).toBe('CAIXA');
+      expect(result.card_last_digits).toBe('1527');
     });
 
     it('deve extrair transação do formato Nubank', () => {
@@ -97,6 +115,32 @@ describe('SMS Extractor Service', () => {
       expect(extractFromSMS('')).toBeNull();
       expect(extractFromSMS(null)).toBeNull();
       expect(extractFromSMS(undefined)).toBeNull();
+    });
+
+    it('deve parsear data corretamente no formato DD/MM', () => {
+      const sms = 'CAIXA: Compra aprovada LOJA R$ 100,00 06/10 às 16:45';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.date).toBe('2025-10-06T16:45:00'); // October 6th, 2025 with time
+      expect(result.date.startsWith('2025-10-06')).toBe(true); // Date portion is correct
+    });
+
+    it('deve parsear data corretamente sem hora', () => {
+      const sms = 'Transferência de R$ 500,00 para Conta 1234-5 em 08/10';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.date).toBe('2025-10-08'); // October 8th, 2025 without time
+    });
+
+    it('deve extrair banco e últimos dígitos do cartão', () => {
+      const sms = 'CAIXA: Compra aprovada RESTAURANTE R$ 150,00 09/10 às 12:30, ELO final 1234';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.bank_name).toBe('CAIXA');
+      expect(result.card_last_digits).toBe('1234');
     });
   });
 

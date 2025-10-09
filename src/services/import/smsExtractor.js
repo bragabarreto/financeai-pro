@@ -1,7 +1,52 @@
 /**
  * SMS/Text Transaction Extractor
  * Extracts transaction data from SMS notifications and text messages
+ * 
+ * Format example: CAIXA[Banco]: Compra aprovada LA BRASILERIE [Estabelecimento]R$ 47,20[Valor]09/10[data DD/MM]as 06:49, ELO final 1527[dados do cartao]
  */
+
+/**
+ * Extract bank name from SMS
+ * @param {string} text - SMS text
+ * @returns {string|null} Bank name
+ */
+const extractBankName = (text) => {
+  const bankPatterns = [
+    /^(CAIXA|CEF|Nubank|Nu|Banco\s+do\s+Brasil|BB|Bradesco|Itau|Itaú|Santander|Inter)/i
+  ];
+  
+  for (const pattern of bankPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[1].toUpperCase();
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Extract card last digits from SMS
+ * @param {string} text - SMS text
+ * @returns {string|null} Last 4 digits
+ */
+const extractCardDigits = (text) => {
+  const patterns = [
+    /final\s+(\d{4})/i,
+    /cart[aã]o\s+(?:final\s+)?(\d{4})/i,
+    /\*{4}\s*(\d{4})/,
+    /(\d{4})(?:\s*$|\s+[^0-9])/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+};
 
 /**
  * Common SMS patterns for Brazilian banks
@@ -9,6 +54,7 @@
 const SMS_PATTERNS = {
   // CAIXA: Compra aprovada COLSANTACECIL R$ 450,00 06/10 às 16:45, ELO VIRTUAL final 6539
   // CAIXA: Compra aprovada em RAFAEL FERNANDES SALE R$ 457,00 em 2 vezes, 06/10 as 19:55
+  // CAIXA: Compra aprovada LA BRASILERIE R$ 47,20 09/10 as 06:49, ELO final 1527
   caixa: {
     pattern: /(?:CAIXA|CEF):\s*Compra\s+aprovada\s+(?:em\s+)?(.*?)\s+R?\$?\s*([\d.,\s]+)(?:\s+em\s+\d+\s+vezes?,?)?\s+(\d{1,2}\/\d{1,2})\s+[aà]s\s+(\d{1,2}:\d{2})/i,
     type: 'expense',
@@ -58,7 +104,7 @@ const SMS_PATTERNS = {
   },
   // TED/DOC: Transferência de R$ 500,00 para Conta 1234-5 em 08/03
   transfer: {
-    pattern: /(?:Transfer[êe]ncia|TED|DOC).*?R?\$?\s*([\d.,]+)(?:.*?para\s+(.*?))?(?:\s+em\s+(\d{1,2}\/\d{1,2}))?/i,
+    pattern: /(?:Transfer[êe]ncia|TED|DOC).*?R?\$?\s*([\d.,]+).*?(?:em|no)\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i,
     type: 'expense',
     paymentMethod: 'transfer'
   },
@@ -106,10 +152,10 @@ const parseAmount = (amountStr) => {
 };
 
 /**
- * Parse date from SMS (usually DD/MM format)
- * @param {string} dateStr - Date string
- * @param {string} timeStr - Time string (optional)
- * @returns {string} ISO date string
+ * Parse date from SMS (Brazilian DD/MM format)
+ * @param {string} dateStr - Date string in DD/MM or DD/MM/YYYY format
+ * @param {string} timeStr - Time string (optional, HH:MM format)
+ * @returns {string} ISO date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
  */
 const parseDate = (dateStr, timeStr = '') => {
   if (!dateStr) {
@@ -119,13 +165,32 @@ const parseDate = (dateStr, timeStr = '') => {
   const now = new Date();
   const currentYear = now.getFullYear();
   
-  // Parse DD/MM
+  // Parse DD/MM or DD/MM/YYYY
+  const matchWithYear = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (matchWithYear) {
+    const day = matchWithYear[1].padStart(2, '0');
+    const month = matchWithYear[2].padStart(2, '0');
+    let year = matchWithYear[3];
+    
+    // Handle 2-digit year
+    if (year.length === 2) {
+      year = `20${year}`;
+    }
+    
+    if (timeStr) {
+      return `${year}-${month}-${day}T${timeStr}:00`;
+    }
+    
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Parse DD/MM (without year)
   const match = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
   if (match) {
     const day = match[1].padStart(2, '0');
     const month = match[2].padStart(2, '0');
     
-    // If time is provided, include it
+    // Use current year
     if (timeStr) {
       return `${currentYear}-${month}-${day}T${timeStr}:00`;
     }
@@ -163,8 +228,12 @@ export const extractFromSMS = (smsText) => {
   
   const text = smsText.trim();
   
+  // Extract bank name and card digits for metadata
+  const bankName = extractBankName(text);
+  const cardDigits = extractCardDigits(text);
+  
   // Try each pattern
-  for (const [bankName, config] of Object.entries(SMS_PATTERNS)) {
+  for (const [patternName, config] of Object.entries(SMS_PATTERNS)) {
     const match = text.match(config.pattern);
     
     if (match) {
@@ -172,39 +241,45 @@ export const extractFromSMS = (smsText) => {
         type: config.type,
         payment_method: config.paymentMethod,
         origin: 'sms_import',
-        raw_text: text.substring(0, 200) // Store original for reference
+        raw_text: text.substring(0, 200), // Store original for reference
+        bank_name: bankName, // Add bank metadata
+        card_last_digits: cardDigits // Add card metadata
       };
       
       // Extract based on pattern type
-      if (bankName === 'caixa') {
+      if (patternName === 'caixa') {
         transaction.description = cleanDescription(match[1]);
         transaction.amount = parseAmount(match[2]);
         transaction.date = parseDate(match[3], match[4]);
-      } else if (bankName === 'nubank') {
+      } else if (patternName === 'nubank') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = cleanDescription(match[2]);
         transaction.date = match[3] ? parseDate(match[3]) : parseDate('');
-      } else if (bankName === 'pix_received' || bankName === 'pix_sent') {
+      } else if (patternName === 'pix_received' || patternName === 'pix_sent') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = cleanDescription(match[2] || 'Transferência PIX');
         transaction.date = match[3] ? parseDate(match[3], match[4]) : parseDate('');
-      } else if (bankName === 'salary') {
+      } else if (patternName === 'salary') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = 'Salário';
         transaction.date = parseDate('');
-      } else if (bankName === 'investment_application') {
+      } else if (patternName === 'investment_application') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = 'Aplicação em Investimento';
         transaction.date = parseDate('');
-      } else if (bankName === 'investment_redemption') {
+      } else if (patternName === 'investment_redemption') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = 'Resgate de Investimento';
         transaction.date = parseDate('');
-      } else if (bankName === 'generic_purchase' || bankName === 'debit' || bankName === 'transfer') {
+      } else if (patternName === 'transfer') {
+        transaction.amount = parseAmount(match[1]);
+        transaction.description = 'Transferência Bancária';
+        transaction.date = match[2] ? parseDate(match[2]) : parseDate('');
+      } else if (patternName === 'generic_purchase' || patternName === 'debit') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = cleanDescription(match[2] || 'Transação');
         transaction.date = match[3] ? parseDate(match[3]) : parseDate('');
-      } else if (bankName === 'generic_amount') {
+      } else if (patternName === 'generic_amount') {
         // Fallback for generic amount detection
         transaction.amount = parseAmount(match[1]);
         transaction.description = 'Transação importada de SMS';

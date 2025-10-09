@@ -15,6 +15,33 @@ import {
 } from '../aiExtractor';
 
 describe('aiExtractor', () => {
+  describe('parseDate', () => {
+    const { parseDate } = require('../aiExtractor');
+    
+    test('should parse DD/MM/YYYY format correctly', () => {
+      expect(parseDate('06/10/2024')).toBe('2024-10-06');
+      expect(parseDate('09/10/2025')).toBe('2025-10-09'); // Fixed: 09/10/2025 = October 9th, 2025
+      expect(parseDate('15/12/2023')).toBe('2023-12-15');
+    });
+
+    test('should parse DD/MM format with current year', () => {
+      const currentYear = new Date().getFullYear();
+      expect(parseDate('06/10')).toBe(`${currentYear}-10-06`);
+      expect(parseDate('09/10')).toBe(`${currentYear}-10-09`);
+    });
+
+    test('should handle 2-digit year correctly', () => {
+      expect(parseDate('06/10/24')).toBe('2024-10-06');
+      expect(parseDate('09/10/25')).toBe('2025-10-09');
+    });
+
+    test('should pad single-digit days and months', () => {
+      expect(parseDate('6/10/2024')).toBe('2024-10-06');
+      expect(parseDate('09/1/2024')).toBe('2024-01-09');
+      expect(parseDate('6/1/2024')).toBe('2024-01-06');
+    });
+  });
+
   describe('detectFieldMapping', () => {
     test('should detect date field', () => {
       const headers = ['Data', 'Descricao', 'Valor'];
@@ -85,6 +112,10 @@ describe('aiExtractor', () => {
       expect(categorizeTransaction('RESTAURANTE ABC')).toBe('alimentacao');
       expect(categorizeTransaction('SUPERMERCADO XYZ')).toBe('alimentacao');
       expect(categorizeTransaction('IFOOD')).toBe('alimentacao');
+      expect(categorizeTransaction('LA BRASILERIE')).toBe('alimentacao');
+      expect(categorizeTransaction('PIZZARIA DONA MARIA')).toBe('alimentacao');
+      expect(categorizeTransaction('BAR DO JOAO')).toBe('alimentacao');
+      expect(categorizeTransaction('CAFE EXPRESSO')).toBe('alimentacao');
     });
 
     test('should categorize transportation', () => {
