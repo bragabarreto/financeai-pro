@@ -5,29 +5,8 @@ import { supabase } from '../supabaseClient';
  * Consulta categorias existentes no banco de dados e sugere categorização
  */
 
-// Palavras-chave para categorização por tipo de transação
-const KEYWORDS_BY_TYPE = {
-  expense: {
-    alimentacao: ['restaurante', 'lanchonete', 'food', 'ifood', 'uber eats', 'padaria', 'mercado', 'supermercado', 'brasilerie', 'pizzaria', 'bar', 'cafe', 'cafeteria', 'lanches', 'hamburgueria', 'confeitaria', 'doceria', 'sorveteria'],
-    transporte: ['uber', '99', 'taxi', 'combustivel', 'gasolina', 'estacionamento', 'pedagio', 'posto'],
-    moradia: ['aluguel', 'condominio', 'iptu', 'agua', 'luz', 'energia', 'gas'],
-    saude: ['farmacia', 'medico', 'hospital', 'clinica', 'consulta', 'plano de saude', 'drogaria'],
-    educacao: ['escola', 'curso', 'faculdade', 'universidade', 'livro', 'livraria'],
-    lazer: ['cinema', 'teatro', 'show', 'streaming', 'netflix', 'spotify', 'ingresso'],
-    vestuario: ['roupa', 'calcado', 'vestuario', 'loja', 'magazine'],
-    telefone: ['telefone', 'celular', 'internet', 'tim', 'vivo', 'claro', 'oi'],
-  },
-  income: {
-    salario: ['salario', 'pagamento', 'pix'],
-    freelance: ['freelance', 'servico', 'prestacao'],
-    investimento: ['rendimento', 'dividendo', 'juros'],
-  },
-  investment: {
-    acoes: ['acao', 'stock', 'bovespa', 'b3'],
-    fundos: ['fundo', 'fii', 'etf'],
-    renda_fixa: ['cdb', 'lci', 'lca', 'tesouro'],
-  }
-};
+// Keywords were removed - AI now categorizes exclusively based on registered user categories
+// This ensures suggestions only come from the user's actual category list
 
 /**
  * Busca categorias existentes do usuário no banco de dados
@@ -69,52 +48,50 @@ const calculateCategoryScore = (text, category) => {
   
   let score = 0;
 
-  // Match exato do nome da categoria
+  // Match exato do nome da categoria no texto
   if (lowerText.includes(categoryName)) {
     score += 0.8;
   }
 
-  // Match parcial (palavras em comum)
-  const textWords = lowerText.split(/\s+/);
-  const categoryWords = categoryName.split(/\s+/);
-  const commonWords = textWords.filter(word => categoryWords.includes(word));
-  score += (commonWords.length / categoryWords.length) * 0.2;
+  // Match reverso: nome da categoria contém palavras do texto
+  const textWords = lowerText.split(/\s+/).filter(word => word.length > 2);
+  const categoryWords = categoryName.split(/\s+/).filter(word => word.length > 2);
+  
+  if (categoryWords.length > 0 && textWords.length > 0) {
+    // Palavras do texto que aparecem na categoria
+    const textInCategory = textWords.filter(word => categoryName.includes(word));
+    if (textInCategory.length > 0) {
+      score += (textInCategory.length / textWords.length) * 0.5;
+    }
+    
+    // Palavras da categoria que aparecem no texto
+    const categoryInText = categoryWords.filter(word => lowerText.includes(word));
+    if (categoryInText.length > 0) {
+      score += (categoryInText.length / categoryWords.length) * 0.3;
+    }
+  }
 
   return Math.min(score, 1);
 };
 
 /**
- * Sugere categoria baseada em palavras-chave
+ * Sugere categoria baseada exclusivamente nas categorias registradas do usuário
+ * A IA escolhe a melhor categoria comparando a descrição da transação com os nomes das categorias
  * @param {string} description - Descrição da transação
  * @param {string} type - Tipo da transação
- * @param {Array} categories - Categorias disponíveis
+ * @param {Array} categories - Categorias disponíveis (somente as registradas pelo usuário)
  * @returns {Object|null} Categoria sugerida com score de confiança
  */
 const suggestCategoryByKeywords = (description, type, categories) => {
-  const lowerDesc = description.toLowerCase();
-  const keywords = KEYWORDS_BY_TYPE[type] || {};
+  if (!categories || categories.length === 0) {
+    return null;
+  }
 
+  const lowerDesc = description.toLowerCase();
   let bestMatch = null;
   let bestScore = 0;
 
-  // Primeiro, tentar match por palavras-chave
-  for (const [categoryKey, keywordList] of Object.entries(keywords)) {
-    for (const keyword of keywordList) {
-      if (lowerDesc.includes(keyword)) {
-        // Procurar categoria correspondente
-        const category = categories.find(c => 
-          c.name.toLowerCase().includes(categoryKey) ||
-          c.name.toLowerCase().includes(keyword)
-        );
-        
-        if (category && !bestMatch) {
-          bestMatch = { category, confidence: 0.6 };
-        }
-      }
-    }
-  }
-
-  // Depois, tentar match por similaridade com nomes de categorias
+  // Comparar descrição da transação com cada categoria registrada
   for (const category of categories) {
     const score = calculateCategoryScore(description, category);
     if (score > bestScore && score > 0.3) {
