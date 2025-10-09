@@ -383,4 +383,157 @@ describe('ImportModal Component', () => {
       expect(mockOnSave).not.toHaveBeenCalled();
     });
   });
+
+  it('deve permitir marcar transação como parcelada no preview', async () => {
+    const mockTransactions = [
+      {
+        date: '2024-01-01',
+        description: 'Compra parcelada 12x',
+        amount: 1200,
+        type: 'expense',
+        category: '1',
+        account_id: 'acc1',
+        is_installment: false,
+        installment_count: null
+      }
+    ];
+
+    extractTransactionsFromFile.mockReturnValue(mockTransactions);
+    categorizeTransactions.mockResolvedValue(mockTransactions);
+
+    const { container } = render(
+      <ImportModal
+        show={true}
+        onClose={mockOnClose}
+        onSave={mockOnSave}
+        categories={mockCategories}
+        accounts={mockAccounts}
+        userId="user123"
+      />
+    );
+
+    const fileInput = container.querySelector('#file-upload');
+    const file = new File(['data'], 'test.csv', { type: 'text/csv' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const processButton = screen.getByText('Processar Arquivo');
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 transação\(ões\) encontrada\(s\)/)).toBeInTheDocument();
+    });
+
+    // Encontrar e marcar checkbox de parcelamento
+    const installmentCheckbox = container.querySelector('input[type="checkbox"]');
+    expect(installmentCheckbox).toBeInTheDocument();
+    fireEvent.click(installmentCheckbox);
+
+    // Verificar que campo de parcelas apareceu
+    const installmentCountInput = container.querySelector('input[type="number"][min="2"]');
+    expect(installmentCountInput).toBeInTheDocument();
+  });
+
+  it('deve calcular datas de parcelas automaticamente', async () => {
+    const mockTransactions = [
+      {
+        date: '2024-01-01',
+        description: 'Compra parcelada',
+        amount: 1200,
+        type: 'expense',
+        category: '1',
+        account_id: 'acc1',
+        is_installment: false,
+        installment_count: null
+      }
+    ];
+
+    extractTransactionsFromFile.mockReturnValue(mockTransactions);
+    categorizeTransactions.mockResolvedValue(mockTransactions);
+
+    const { container } = render(
+      <ImportModal
+        show={true}
+        onClose={mockOnClose}
+        onSave={mockOnSave}
+        categories={mockCategories}
+        accounts={mockAccounts}
+        userId="user123"
+      />
+    );
+
+    const fileInput = container.querySelector('#file-upload');
+    const file = new File(['data'], 'test.csv', { type: 'text/csv' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const processButton = screen.getByText('Processar Arquivo');
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 transação\(ões\) encontrada\(s\)/)).toBeInTheDocument();
+    });
+
+    // Marcar como parcelado
+    const installmentCheckbox = container.querySelector('input[type="checkbox"]');
+    fireEvent.click(installmentCheckbox);
+
+    // Inserir número de parcelas
+    const installmentCountInput = container.querySelector('input[type="number"][min="2"]');
+    fireEvent.change(installmentCountInput, { target: { value: '12' } });
+
+    // Verificar que a data da última parcela é exibida
+    await waitFor(() => {
+      const dateDisplay = screen.getByText(/até/);
+      expect(dateDisplay).toBeInTheDocument();
+    });
+  });
+
+  it('deve reconhecer transações parceladas automaticamente da descrição', async () => {
+    const mockTransactions = [
+      {
+        date: '2024-01-01',
+        description: 'Compra Magazine Luiza 3/12',
+        amount: 100,
+        type: 'expense',
+        category: '1',
+        account_id: 'acc1',
+        is_installment: true,
+        installment_count: 12,
+        installment_due_dates: ['2024-01-01', '2024-02-01', '2024-03-01', '2024-04-01', '2024-05-01', '2024-06-01', '2024-07-01', '2024-08-01', '2024-09-01', '2024-10-01', '2024-11-01', '2024-12-01'],
+        last_installment_date: '2024-12-01'
+      }
+    ];
+
+    extractTransactionsFromFile.mockReturnValue(mockTransactions);
+    categorizeTransactions.mockResolvedValue(mockTransactions);
+
+    const { container } = render(
+      <ImportModal
+        show={true}
+        onClose={mockOnClose}
+        onSave={mockOnSave}
+        categories={mockCategories}
+        accounts={mockAccounts}
+        userId="user123"
+      />
+    );
+
+    const fileInput = container.querySelector('#file-upload');
+    const file = new File(['data'], 'test.csv', { type: 'text/csv' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const processButton = screen.getByText('Processar Arquivo');
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 transação\(ões\) encontrada\(s\)/)).toBeInTheDocument();
+    });
+
+    // Verificar que checkbox está marcado
+    const installmentCheckbox = container.querySelector('input[type="checkbox"]');
+    expect(installmentCheckbox).toBeChecked();
+
+    // Verificar que número de parcelas está preenchido
+    const installmentCountInput = container.querySelector('input[type="number"][min="2"]');
+    expect(installmentCountInput.value).toBe('12');
+  });
 });

@@ -77,3 +77,32 @@ WHERE table_name IN ('credit_cards', 'user_settings')
 ORDER BY table_name, ordinal_position;
 
 -- Fim da migration
+
+-- Migration Script: Adicionar suporte a transações parceladas
+-- Data: Atual
+-- Descrição: Adiciona campos para permitir registro de transações parceladas
+
+-- 12. Adicionar campos de parcelamento na tabela transactions
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS is_installment BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS installment_count INTEGER;
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS installment_due_dates TEXT[];
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS last_installment_date DATE;
+
+-- 13. Adicionar comentários nas colunas
+COMMENT ON COLUMN transactions.is_installment IS 'Indica se a transação é parcelada';
+COMMENT ON COLUMN transactions.installment_count IS 'Quantidade de parcelas (número de meses)';
+COMMENT ON COLUMN transactions.installment_due_dates IS 'Array com datas de vencimento mensal';
+COMMENT ON COLUMN transactions.last_installment_date IS 'Data da última parcela';
+
+-- 14. Criar índice para consultas de transações parceladas
+CREATE INDEX IF NOT EXISTS idx_transactions_installment 
+ON transactions(is_installment) WHERE is_installment = TRUE;
+
+-- Fim da migration de parcelamento

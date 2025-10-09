@@ -227,7 +227,11 @@ export const importTransactions = async (transactions, userId, accountId, catego
         amount: amount,
         category: categoryId,
         date: date,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        is_installment: transaction.is_installment || false,
+        installment_count: transaction.installment_count || null,
+        installment_due_dates: transaction.installment_due_dates || null,
+        last_installment_date: transaction.last_installment_date || null
       };
       
       // Insert into database

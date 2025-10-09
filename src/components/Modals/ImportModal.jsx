@@ -88,7 +88,38 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
       // Se usuário editar manualmente, marcar como não-sugestão
       isSuggestion: field === 'category' ? false : updated[index].isSuggestion
     };
+    
+    // If updating installment-related fields, recalculate dates
+    if (field === 'is_installment' && !value) {
+      // Reset installment fields when unchecking
+      updated[index].installment_count = null;
+      updated[index].installment_due_dates = [];
+      updated[index].last_installment_date = null;
+    } else if (field === 'installment_count' || (field === 'date' && updated[index].is_installment)) {
+      // Recalculate dates when count or date changes
+      const count = field === 'installment_count' ? parseInt(value) : updated[index].installment_count;
+      const startDate = field === 'date' ? value : updated[index].date;
+      
+      if (count > 0 && startDate) {
+        const dates = calculateInstallmentDates(startDate, count);
+        updated[index].installment_due_dates = dates;
+        updated[index].last_installment_date = dates[dates.length - 1];
+      }
+    }
+    
     setTransactions(updated);
+  };
+
+  // Helper function to calculate installment dates
+  const calculateInstallmentDates = (startDate, count) => {
+    const dates = [];
+    const date = new Date(startDate);
+    for (let i = 0; i < count; i++) {
+      const installmentDate = new Date(date);
+      installmentDate.setMonth(date.getMonth() + i);
+      dates.push(installmentDate.toISOString().split('T')[0]);
+    }
+    return dates;
   };
 
   const handleRemoveTransaction = (index) => {
@@ -227,6 +258,8 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parcelado</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parcelas</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confiança</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                     </tr>
@@ -299,6 +332,36 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                               </option>
                             ))}
                           </select>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={transaction.is_installment || false}
+                            onChange={(e) => handleTransactionUpdate(index, 'is_installment', e.target.checked)}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {transaction.is_installment ? (
+                            <div className="space-y-1">
+                              <input
+                                type="number"
+                                min="2"
+                                max="48"
+                                value={transaction.installment_count || ''}
+                                onChange={(e) => handleTransactionUpdate(index, 'installment_count', parseInt(e.target.value))}
+                                className="w-16 px-2 py-1 border rounded text-sm"
+                                placeholder="12"
+                              />
+                              {transaction.installment_count > 0 && transaction.last_installment_date && (
+                                <div className="text-xs text-gray-600">
+                                  até {new Date(transaction.last_installment_date).toLocaleDateString('pt-BR')}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {transaction.isSuggestion && transaction.category ? (
