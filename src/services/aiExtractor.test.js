@@ -134,7 +134,7 @@ describe('aiExtractor Service', () => {
       jest.clearAllMocks();
     });
 
-    it('deve sugerir categorias para transações baseado em palavras-chave', async () => {
+    it('deve retornar estrutura correta para transações categorizadas', async () => {
       const mockCategories = [
         { id: '1', name: 'Alimentação', type: 'expense' },
         { id: '2', name: 'Transporte', type: 'expense' }
