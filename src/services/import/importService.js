@@ -223,9 +223,10 @@ export const importTransactions = async (transactions, userId, accountId, catego
       
       // If it's a Date object, convert to ISO string without timezone issues
       if (date instanceof Date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        // Use UTC methods to avoid timezone shifts
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
         date = `${year}-${month}-${day}`;
       } 
       // If it's already in ISO format, extract just the date part (remove time if present)
