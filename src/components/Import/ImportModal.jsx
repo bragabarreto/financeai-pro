@@ -215,8 +215,10 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         
         // Try AI suggestion
         let matchedCategory = null;
+        let suggestionSource = null;
         if (t.aiSuggestedCategory) {
           matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
+          suggestionSource = 'ai';
         }
         
         // Auto-assign account or card based on payment method
@@ -239,7 +241,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           account_id: defaultAccountId,
           card_id: defaultCardId
         };
-      }));
+      });
 
       const validation = {
         valid: true,

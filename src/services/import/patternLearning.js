@@ -3,7 +3,7 @@
  * Aprende padrões de categorização baseado no histórico de transações do usuário
  */
 
-import { supabase } from '../../config/supabaseClient';
+import { supabase } from '../../supabaseClient';
 
 /**
  * Busca histórico de transações do usuário para aprender padrões
