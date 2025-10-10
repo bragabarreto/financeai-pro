@@ -228,12 +228,15 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
               value={formData.payment_method}
               onChange={(e) => {
                 const newPaymentMethod = e.target.value;
+                const primaryAccount = accounts.find(acc => acc.is_primary);
+                const needsAccount = ['debit_card', 'pix', 'transfer', 'application', 'redemption', 'paycheck'].includes(newPaymentMethod);
+                
                 setFormData({
                   ...formData, 
                   payment_method: newPaymentMethod,
                   // Reset card/account when changing payment method
                   card_id: newPaymentMethod === 'credit_card' ? formData.card_id : '',
-                  account_id: newPaymentMethod !== 'credit_card' ? formData.account_id : ''
+                  account_id: needsAccount && !formData.account_id && primaryAccount ? primaryAccount.id : (newPaymentMethod === 'credit_card' ? '' : formData.account_id)
                 });
               }}
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -293,7 +296,7 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
             <div>
               <label className="block text-sm font-medium mb-1">Conta Bancária *</label>
               <select
-                value={formData.account_id || (primaryAccount?.id || '')}
+                value={formData.account_id || ''}
                 onChange={(e) => setFormData({...formData, account_id: e.target.value})}
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
