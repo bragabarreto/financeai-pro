@@ -72,6 +72,15 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       return;
     }
 
+    // Validar se usuário tem contas ou cartões cadastrados
+    if (accounts.length === 0 && cards.length === 0) {
+      setError(
+        'Você precisa cadastrar pelo menos uma conta bancária ou cartão de crédito antes de importar transações. ' +
+        'Vá para a aba "Contas" ou "Cartões" para cadastrar.'
+      );
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -128,18 +137,36 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           }
         }
         
-        // Auto-assign account or card based on payment method
+        // Auto-assign account or card based on payment method with intelligent fallback
         let defaultAccountId = null;
         let defaultCardId = null;
+        let needsReview = false;
         
         if (t.payment_method === 'credit_card') {
-          // For credit card, try to match from AI or assign first available card
-          defaultCardId = t.card_id || (cards.length > 0 ? cards[0].id : null);
+          // Tentar atribuir cartão se for crédito
+          if (t.card_id) {
+            defaultCardId = t.card_id;
+          } else if (cards.length > 0) {
+            defaultCardId = cards[0].id;
+          } else {
+            // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
+            defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
+            needsReview = true; // Marcar como necessitando revisão
+          }
         } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
                    t.payment_method === 'transfer' || t.payment_method === 'application' || 
                    t.payment_method === 'redemption') {
-          // For account-based payments, assign account
-          defaultAccountId = t.account_id || (accounts.length > 0 ? accounts[0].id : null);
+          // Tentar atribuir conta para outros métodos
+          if (t.account_id) {
+            defaultAccountId = t.account_id;
+          } else if (accounts.length > 0) {
+            // Preferir conta principal se existir
+            const primaryAcc = accounts.find(a => a.is_primary);
+            defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
+          } else {
+            // Sem contas disponíveis - marcar como erro
+            needsReview = true;
+          }
         }
         
         return {
@@ -149,7 +176,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           suggestionSource: suggestionSource, // 'ai', 'history', or null
           manuallyEdited: false,
           account_id: defaultAccountId,
-          card_id: defaultCardId
+          card_id: defaultCardId,
+          needsReview: needsReview // Marcar transações que precisam de revisão manual
         };
       }));
 
@@ -183,6 +211,15 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
     if (!useAI || !isAIAvailable()) {
       setError('Extração de fotos requer IA configurada. Vá em Configurações → Configuração de IA');
+      return;
+    }
+
+    // Validar se usuário tem contas ou cartões cadastrados
+    if (accounts.length === 0 && cards.length === 0) {
+      setError(
+        'Você precisa cadastrar pelo menos uma conta bancária ou cartão de crédito antes de importar transações. ' +
+        'Vá para a aba "Contas" ou "Cartões" para cadastrar.'
+      );
       return;
     }
 
@@ -221,15 +258,36 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           suggestionSource = 'ai';
         }
         
-        // Auto-assign account or card based on payment method
+        // Auto-assign account or card based on payment method with intelligent fallback
         let defaultAccountId = null;
         let defaultCardId = null;
+        let needsReview = false;
         
         if (t.payment_method === 'credit_card') {
-          defaultCardId = t.card_id || (cards.length > 0 ? cards[0].id : null);
+          // Tentar atribuir cartão se for crédito
+          if (t.card_id) {
+            defaultCardId = t.card_id;
+          } else if (cards.length > 0) {
+            defaultCardId = cards[0].id;
+          } else {
+            // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
+            defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
+            needsReview = true; // Marcar como necessitando revisão
+          }
         } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
-                   t.payment_method === 'transfer') {
-          defaultAccountId = t.account_id || (accounts.length > 0 ? accounts[0].id : null);
+                   t.payment_method === 'transfer' || t.payment_method === 'application' || 
+                   t.payment_method === 'redemption') {
+          // Tentar atribuir conta para outros métodos
+          if (t.account_id) {
+            defaultAccountId = t.account_id;
+          } else if (accounts.length > 0) {
+            // Preferir conta principal se existir
+            const primaryAcc = accounts.find(a => a.is_primary);
+            defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
+          } else {
+            // Sem contas disponíveis - marcar como erro
+            needsReview = true;
+          }
         }
         
         return {
@@ -239,7 +297,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           suggestionSource: suggestionSource, // 'ai', 'history', or null
           manuallyEdited: false,
           account_id: defaultAccountId,
-          card_id: defaultCardId
+          card_id: defaultCardId,
+          needsReview: needsReview // Marcar transações que precisam de revisão manual
         };
       });
 
@@ -277,6 +336,15 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       return;
     }
 
+    // Validar se usuário tem contas ou cartões cadastrados
+    if (accounts.length === 0 && cards.length === 0) {
+      setError(
+        'Você precisa cadastrar pelo menos uma conta bancária ou cartão de crédito antes de importar transações. ' +
+        'Vá para a aba "Contas" ou "Cartões" para cadastrar.'
+      );
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -302,18 +370,36 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           c.name.toLowerCase() === (t.category || '').toLowerCase()
         );
         
-        // Auto-assign account or card based on payment method
+        // Auto-assign account or card based on payment method with intelligent fallback
         let defaultAccountId = null;
         let defaultCardId = null;
+        let needsReview = false;
         
         if (t.payment_method === 'credit_card') {
-          // For credit card, assign first available card
-          defaultCardId = t.card_id || (cards.length > 0 ? cards[0].id : null);
+          // Tentar atribuir cartão se for crédito
+          if (t.card_id) {
+            defaultCardId = t.card_id;
+          } else if (cards.length > 0) {
+            defaultCardId = cards[0].id;
+          } else {
+            // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
+            defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
+            needsReview = true; // Marcar como necessitando revisão
+          }
         } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
                    t.payment_method === 'transfer' || t.payment_method === 'application' || 
                    t.payment_method === 'redemption') {
-          // For account-based payments, assign account
-          defaultAccountId = t.account_id || (accounts.length > 0 ? accounts[0].id : null);
+          // Tentar atribuir conta para outros métodos
+          if (t.account_id) {
+            defaultAccountId = t.account_id;
+          } else if (accounts.length > 0) {
+            // Preferir conta principal se existir
+            const primaryAcc = accounts.find(a => a.is_primary);
+            defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
+          } else {
+            // Sem contas disponíveis - marcar como erro
+            needsReview = true;
+          }
         }
         
         return {
@@ -324,7 +410,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           selected: true,
           account_id: defaultAccountId,
           card_id: defaultCardId,
-          is_alimony: false
+          is_alimony: false,
+          needsReview: needsReview // Marcar transações que precisam de revisão manual
         };
       });
 
@@ -406,7 +493,18 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     // Validate that all transactions have account_id or card_id
     const missingLinkage = selectedTransactions.filter(t => !t.account_id && !t.card_id);
     if (missingLinkage.length > 0) {
-      setError(`${missingLinkage.length} transação(ões) sem conta ou cartão vinculado. Por favor, vincule todas as transações.`);
+      // Destacar transações sem vinculação
+      const updatedTransactions = editingTransactions.map(t => ({
+        ...t,
+        hasError: !t.account_id && !t.card_id && t.selected
+      }));
+      setEditingTransactions(updatedTransactions);
+      
+      setError(
+        `${missingLinkage.length} transação(ões) sem conta ou cartão vinculado. ` +
+        `Por favor, selecione uma conta ou cartão para cada transação destacada em vermelho na tabela abaixo. ` +
+        `Você também pode desmarcar as transações inválidas para importar apenas as válidas.`
+      );
       return;
     }
 
