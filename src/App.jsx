@@ -314,9 +314,21 @@ const handleSaveAccount = async (accountData) => {
 
   const handleSaveTransaction = async (transactionData) => {
     try {
+      // Garantir que a data seja sempre no formato correto (YYYY-MM-DD local)
+      let dateToSave = transactionData.date;
+      if (dateToSave && dateToSave.includes('T')) {
+        // Se vier com horário (ISO string), extrair apenas a data local
+        const localDate = new Date(dateToSave);
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
+        dateToSave = `${year}-${month}-${day}`;
+      }
+
       const dataToSave = {
         ...transactionData,
         user_id: user.id,
+        date: dateToSave,
         amount: parseFloat(transactionData.amount) || 0,
         is_alimony: transactionData.is_alimony || false
       };
@@ -350,15 +362,29 @@ const handleSaveAccount = async (accountData) => {
 
   const handleBulkImportTransactions = async (transactions) => {
     try {
-      const dataToSave = transactions.map(t => ({
-        ...t,
-        user_id: user.id,
-        amount: parseFloat(t.amount) || 0,
-        // Remover campos de UI que não fazem parte do schema
-        suggestedCategory: undefined,
-        categoryConfidence: undefined,
-        isSuggestion: undefined
-      }));
+      const dataToSave = transactions.map(t => {
+        // Garantir que a data seja sempre no formato correto (YYYY-MM-DD local)
+        let dateToSave = t.date;
+        if (dateToSave && dateToSave.includes('T')) {
+          // Se vier com horário (ISO string), extrair apenas a data local
+          const localDate = new Date(dateToSave);
+          const year = localDate.getFullYear();
+          const month = String(localDate.getMonth() + 1).padStart(2, '0');
+          const day = String(localDate.getDate()).padStart(2, '0');
+          dateToSave = `${year}-${month}-${day}`;
+        }
+
+        return {
+          ...t,
+          user_id: user.id,
+          date: dateToSave,
+          amount: parseFloat(t.amount) || 0,
+          // Remover campos de UI que não fazem parte do schema
+          suggestedCategory: undefined,
+          categoryConfidence: undefined,
+          isSuggestion: undefined
+        };
+      });
 
       const { error } = await supabase
         .from('transactions')
