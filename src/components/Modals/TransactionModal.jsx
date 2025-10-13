@@ -295,7 +295,7 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
                 </p>
               )}
             </div>
-          ) : formData.payment_method && formData.payment_method !== '' ? (
+          ) : formData.payment_method && formData.payment_method !== '' && formData.payment_method !== 'credit_card' ? (
             <div>
               <label className="block text-sm font-medium mb-1">Conta Bancária *</label>
               <select
