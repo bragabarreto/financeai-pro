@@ -4,7 +4,7 @@
  * to extract financial transaction data from various formats
  */
 
-import { formatDateLocal } from '../dateUtils';
+import { formatDateLocal } from '../../utils/dateUtils';
 
 /**
  * Common field patterns for transaction data

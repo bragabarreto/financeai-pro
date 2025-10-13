@@ -3,7 +3,7 @@
  * Extracts transaction data from SMS notifications using AI
  */
 
-import { getTodayLocalDate } from '../dateUtils';
+import { getTodayLocalDate } from '../../utils/dateUtils';
 
 /**
  * Parse Brazilian currency format
