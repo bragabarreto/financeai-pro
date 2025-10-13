@@ -1,4 +1,5 @@
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabase';
+import { getTodayLocalDate, formatDateLocal } from '../utils/dateUtils';Client';
 
 /**
  * Serviço de extração e categorização inteligente de transações
@@ -207,7 +208,7 @@ const calculateInstallmentDates = (startDate, count) => {
   for (let i = 0; i < count; i++) {
     const installmentDate = new Date(date);
     installmentDate.setMonth(date.getMonth() + i);
-    dates.push(installmentDate.toISOString().split('T')[0]);
+    dates.push(formatDateLocal(installmentDate));
   }
   return dates;
 };
@@ -241,7 +242,7 @@ const extractFromCSV = (csvContent) => {
     
     if (values.length < header.length) continue;
 
-    const date = dateIndex >= 0 ? parseDate(values[dateIndex]) : new Date().toISOString().split('T')[0];
+    const date = dateIndex >= 0 ? parseDate(values[dateIndex]) : getTodayLocalDate();
     const description = descIndex >= 0 ? values[descIndex].replace(/['"]/g, '') : '';
     const amount = amountIndex >= 0 ? parseFloat(values[amountIndex].replace(/[^\d.-]/g, '')) : 0;
     
@@ -320,7 +321,7 @@ const parseDate = (dateStr) => {
     }
   }
 
-  return new Date().toISOString().split('T')[0];
+  return getTodayLocalDate();
 };
 
 /**

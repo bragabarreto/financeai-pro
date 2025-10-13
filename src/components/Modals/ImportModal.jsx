@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, AlertCircle, Upload, Check, Edit2, FileText } from 'lucide-react';
 import { extractTransactionsFromFile, categorizeTransactions } from '../../services/aiExtractor';
+import { formatDateLocal } from '../../utils/dateUtils';Extractor';
 
 const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) => {
   const [step, setStep] = useState('upload'); // upload, preview, processing
@@ -117,7 +118,7 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
     for (let i = 0; i < count; i++) {
       const installmentDate = new Date(date);
       installmentDate.setMonth(date.getMonth() + i);
-      dates.push(installmentDate.toISOString().split('T')[0]);
+      dates.push(formatDateLocal(installmentDate));
     }
     return dates;
   };

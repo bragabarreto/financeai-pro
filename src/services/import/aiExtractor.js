@@ -4,6 +4,8 @@
  * to extract financial transaction data from various formats
  */
 
+import { formatDateLocal } from '../dateUtils';
+
 /**
  * Common field patterns for transaction data
  */
@@ -157,7 +159,7 @@ export const parseDate = (dateString) => {
   // Try to parse as JS Date
   const date = new Date(dateStr);
   if (!isNaN(date.getTime())) {
-    return date.toISOString().split('T')[0];
+    return formatDateLocal(date);
   }
   
   return null;

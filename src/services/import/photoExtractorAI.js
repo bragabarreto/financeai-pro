@@ -3,6 +3,8 @@
  * Extracts transaction data from photos/images using Vision AI
  */
 
+import { getTodayLocalDate } from '../dateUtils';
+
 /**
  * Parse Brazilian currency format
  * @param {string} amountStr - Amount string
@@ -35,7 +37,7 @@ const parseAmount = (amountStr) => {
 const parseDate = (dateStr) => {
   if (!dateStr) {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    return getTodayLocalDate();
   }
   
   // Try DD/MM/YYYY
@@ -53,8 +55,7 @@ const parseDate = (dateStr) => {
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
   
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+  return getTodayLocalDate();
 };
 
 /**

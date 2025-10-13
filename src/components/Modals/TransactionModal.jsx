@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Users } from 'lucide-react';
+import { getTodayLocalDate, formatDateLocal } from '../../utils/dateUtils';
 
 const TransactionModal = ({ show, onClose, onSave, transaction, categories, accounts, cards = [] }) => {
   const [formData, setFormData] = useState({
@@ -10,7 +11,7 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
     account_id: '',
     card_id: '',
     payment_method: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayLocalDate(),
     origin: '',
     is_alimony: false,
     is_installment: false,
@@ -44,7 +45,7 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
         account_id: '',
         card_id: '',
         payment_method: '',
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayLocalDate(),
         origin: '',
         is_alimony: false,
         is_installment: false,
@@ -116,7 +117,7 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
     for (let i = 0; i < count; i++) {
       const installmentDate = new Date(date);
       installmentDate.setMonth(date.getMonth() + i);
-      dates.push(installmentDate.toISOString().split('T')[0]);
+      dates.push(formatDateLocal(installmentDate));
     }
     return dates;
   };

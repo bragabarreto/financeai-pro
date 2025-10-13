@@ -3,6 +3,8 @@
  * Extracts transaction data from SMS notifications using AI
  */
 
+import { getTodayLocalDate } from '../dateUtils';
+
 /**
  * Parse Brazilian currency format
  * @param {string} amountStr - Amount string
@@ -35,7 +37,7 @@ const parseAmount = (amountStr) => {
 const parseDate = (dateStr) => {
   if (!dateStr) {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    return getTodayLocalDate();
   }
   
   const parts = dateStr.split('/');
@@ -50,7 +52,7 @@ const parseDate = (dateStr) => {
     return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
   
-  return today.toISOString().split('T')[0];
+  return getTodayLocalDate();
 };
 
 /**
