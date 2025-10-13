@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Users } from 'lucide-react';
 import { getTodayLocalDate, formatDateLocal } from '../../utils/dateUtils';
 
+// Transaction Modal Component - Fixed: payment_method, dates, account selection
+
 const TransactionModal = ({ show, onClose, onSave, transaction, categories, accounts, cards = [] }) => {
   const [formData, setFormData] = useState({
     type: 'expense',
