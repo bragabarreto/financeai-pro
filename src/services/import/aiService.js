@@ -397,3 +397,23 @@ export const getAIStatus = () => {
     }
   };
 };
+
+/**
+ * Get AI configuration from localStorage
+ * This is used for features that need AI config (like photo extraction)
+ * @returns {Object|null} AI configuration object or null if not configured
+ */
+export const getAIConfig = () => {
+  try {
+    const configStr = localStorage.getItem('ai_config');
+    if (configStr) {
+      const config = JSON.parse(configStr);
+      if (config.enabled && config.apiKey && config.provider) {
+        return config;
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao carregar configuração de IA:', error);
+  }
+  return null;
+};
