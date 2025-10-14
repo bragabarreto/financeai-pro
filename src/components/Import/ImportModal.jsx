@@ -8,8 +8,12 @@ import { processImportFile, importTransactions } from '../../services/import/imp
 import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
 import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus, getAIConfig } from '../../services/import/aiService';
 import { extractFromPhoto } from '../../services/import/photoExtractorAI';
+import { useAIConfig, checkAIAvailability } from '../../hooks/useAIConfig';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
+  // Carregar configuração de IA do Supabase automaticamente
+  const { config: aiConfig, loading: aiConfigLoading, isConfigured } = useAIConfig(user?.id, show);
+  
   const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Result
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -24,6 +28,16 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
   const [smsText, setSmsText] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const [useAI, setUseAI] = useState(isAIAvailable());
+  
+  // Atualizar useAI quando aiConfig carregar
+  useEffect(() => {
+    if (aiConfig && isConfigured) {
+      setUseAI(true);
+      console.log('✅ IA configurada e disponível para uso');
+    } else if (!aiConfigLoading && !isConfigured) {
+      setUseAI(isAIAvailable()); // Fallback para variáveis de ambiente
+    }
+  }, [aiConfig, isConfigured, aiConfigLoading]);
 
   const getPaymentMethodLabel = (method) => {
     const labels = {
@@ -209,17 +223,20 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       return;
     }
 
-    if (!useAI || !isAIAvailable()) {
-      setError('Extração de fotos requer IA configurada. Vá em Configurações → Configuração de IA');
+    // Verificar se IA está configurada usando o hook
+    if (!aiConfig || !isConfigured) {
+      setError(
+        'Extração de fotos requer IA configurada. ' +
+        'Vá em Configurações → Configuração de IA para configurar sua chave de API.'
+      );
       return;
     }
-
-    // Get AI configuration
-    const aiConfig = getAIConfig();
-    if (!aiConfig) {
-      setError('Configuração de IA não encontrada. Por favor, configure a IA em Configurações → Configuração de IA');
-      return;
-    }
+    
+    console.log('🔄 Processando foto com configuração:', {
+      provider: aiConfig.provider,
+      model: aiConfig.model,
+      enabled: aiConfig.enabled
+    });
 
     // Validar se usuário tem contas ou cartões cadastrados
     if (accounts.length === 0 && cards.length === 0) {
@@ -842,7 +859,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                     />
                     
-                    {isAIAvailable() && (
+                    {(isConfigured || isAIAvailable()) && (
                       <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -857,9 +874,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                           </span>
                         </label>
                         <p className="text-xs text-gray-600 mt-1 ml-9">
-                          APIs configuradas: {getAIStatus().providers.gemini.enabled && 'Gemini'} 
-                          {getAIStatus().providers.openai.enabled && ', ChatGPT'}
-                          {getAIStatus().providers.anthropic.enabled && ', Claude'}
+                          {isConfigured ? (
+                            `IA configurada: ${aiConfig.provider} (${aiConfig.model || 'modelo padrão'})`
+                          ) : (
+                            `APIs configuradas: ${getAIStatus().providers.gemini.enabled ? 'Gemini' : ''} ${getAIStatus().providers.openai.enabled ? ', ChatGPT' : ''} ${getAIStatus().providers.anthropic.enabled ? ', Claude' : ''}`
+                          )}
                         </p>
                       </div>
                     )}
@@ -940,7 +959,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       </div>
                     )}
                     
-                    {isAIAvailable() && (
+                    {(isConfigured || isAIAvailable()) && (
                       <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -955,9 +974,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                           </span>
                         </label>
                         <p className="text-xs text-gray-600 mt-1 ml-9">
-                          APIs configuradas: {getAIStatus().providers.gemini.enabled && 'Gemini'} 
-                          {getAIStatus().providers.openai.enabled && ', ChatGPT'}
-                          {getAIStatus().providers.anthropic.enabled && ', Claude'}
+                          {isConfigured ? (
+                            `IA configurada: ${aiConfig.provider} (${aiConfig.model || 'modelo padrão'})`
+                          ) : (
+                            `APIs configuradas: ${getAIStatus().providers.gemini.enabled ? 'Gemini' : ''} ${getAIStatus().providers.openai.enabled ? ', ChatGPT' : ''} ${getAIStatus().providers.anthropic.enabled ? ', Claude' : ''}`
+                          )}
                         </p>
                       </div>
                     )}
