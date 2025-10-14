@@ -18,6 +18,7 @@ import ImportModal from './components/Import/ImportModal';
 import TransactionList from './components/TransactionList/TransactionList';
 import Portfolio from './components/Portfolio/Portfolio';
 import CategoriesManager from './components/Categories/CategoriesManager';
+import AIConfigSettings from './components/Settings/AIConfigSettings';
 
 const App = () => {
   // Estados de Autenticação
@@ -1047,6 +1048,9 @@ const loadCards = async () => {
                 </div>
               </div>
             </div>
+
+            {/* AI Configuration */}
+            <AIConfigSettings user={user} />
 
             {/* Management Options */}
             <div className="bg-white rounded-xl shadow-lg p-6">
