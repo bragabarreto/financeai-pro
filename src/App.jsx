@@ -19,6 +19,7 @@ import TransactionList from './components/TransactionList/TransactionList';
 import Portfolio from './components/Portfolio/Portfolio';
 import CategoriesManager from './components/Categories/CategoriesManager';
 import AIConfigSettings from './components/Settings/AIConfigSettings';
+import BillsManager from './components/Bills/BillsManager';
 
 const App = () => {
   // Estados de Autenticação
@@ -326,22 +327,84 @@ const handleSaveAccount = async (accountData) => {
         dateToSave = `${year}-${month}-${day}`;
       }
 
-      const dataToSave = {
-        ...transactionData,
-        user_id: user.id,
-        date: dateToSave,
-        amount: parseFloat(transactionData.amount) || 0,
-        is_alimony: transactionData.is_alimony || false
-      };
-
+      // Verificar se é uma transação parcelada
+      const isInstallment = transactionData.is_installment && transactionData.installment_count > 1;
+      
       if (transactionData.id) {
+        // Edição de transação existente (não criar parcelas)
+        const dataToSave = {
+          ...transactionData,
+          user_id: user.id,
+          date: dateToSave,
+          amount: parseFloat(transactionData.amount) || 0,
+          is_alimony: transactionData.is_alimony || false
+        };
+        
         const { error } = await supabase
           .from('transactions')
           .update(dataToSave)
           .eq('id', transactionData.id);
         if (error) throw error;
         showToast('Transação atualizada!', 'success');
+      } else if (isInstallment) {
+        // Nova transação parcelada - criar múltiplos registros
+        const installmentCount = parseInt(transactionData.installment_count);
+        const totalAmount = parseFloat(transactionData.amount);
+        const installmentAmount = totalAmount / installmentCount;
+        
+        // Criar array de transações (uma para cada parcela)
+        const installmentTransactions = [];
+        const startDate = new Date(dateToSave);
+        
+        for (let i = 0; i < installmentCount; i++) {
+          const installmentDate = new Date(startDate);
+          installmentDate.setMonth(startDate.getMonth() + i);
+          
+          const year = installmentDate.getFullYear();
+          const month = String(installmentDate.getMonth() + 1).padStart(2, '0');
+          const day = String(installmentDate.getDate()).padStart(2, '0');
+          const formattedDate = `${year}-${month}-${day}`;
+          
+          installmentTransactions.push({
+            user_id: user.id,
+            type: transactionData.type,
+            description: `${transactionData.description} (${i + 1}/${installmentCount})`,
+            amount: installmentAmount,
+            category: transactionData.category,
+            account_id: transactionData.account_id || null,
+            card_id: transactionData.card_id || null,
+            payment_method: transactionData.payment_method,
+            date: formattedDate,
+            origin: transactionData.origin || 'manual',
+            is_alimony: transactionData.is_alimony || false,
+            is_installment: true,
+            installment_count: installmentCount,
+            installment_due_dates: null, // Não precisamos mais deste campo
+            last_installment_date: null   // Não precisamos mais deste campo
+          });
+        }
+        
+        // Inserir todas as parcelas de uma vez
+        const { error } = await supabase
+          .from('transactions')
+          .insert(installmentTransactions);
+        
+        if (error) throw error;
+        showToast(`${installmentCount} parcelas criadas com sucesso!`, 'success');
       } else {
+        // Nova transação simples (não parcelada)
+        const dataToSave = {
+          ...transactionData,
+          user_id: user.id,
+          date: dateToSave,
+          amount: parseFloat(transactionData.amount) || 0,
+          is_alimony: transactionData.is_alimony || false,
+          is_installment: false,
+          installment_count: null,
+          installment_due_dates: null,
+          last_installment_date: null
+        };
+        
         const { error } = await supabase
           .from('transactions')
           .insert([dataToSave]);
@@ -357,6 +420,7 @@ const handleSaveAccount = async (accountData) => {
       setShowTransactionModal(false);
       setEditingTransaction(null);
     } catch (error) {
+      console.error('Erro ao salvar transação:', error);
       showToast('Erro ao salvar transação', 'error');
     }
   };
@@ -602,6 +666,7 @@ const loadCards = async () => {
               { id: 'income', label: 'Receitas', icon: TrendingUp },
               { id: 'investments', label: 'Investimentos', icon: BarChart3 },
               { id: 'cards', label: 'Cartões', icon: CreditCard },
+              { id: 'bills', label: 'Faturas', icon: FileText },
               { id: 'goals', label: 'Metas', icon: Target },
               { id: 'reports', label: 'Relatórios', icon: FileText },
               { id: 'accounts', label: 'Contas bancárias', icon: DollarSign },
@@ -937,6 +1002,14 @@ const loadCards = async () => {
             cards={cards}
             loadCards={loadCards}
             />
+        )}
+
+        {/* Bills Tab */}
+        {activeTab === 'bills' && (
+          <BillsManager 
+            user={user} 
+            cards={cards}
+          />
         )}
 
         {/* Goals Tab */}
