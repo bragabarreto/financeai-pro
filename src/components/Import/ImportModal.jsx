@@ -253,16 +253,37 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         is_alimony: false
       }));
 
-      // Map categories
-      const transactionsWithCategoryMapping = transactions.map(t => {
+      // Use AI enhancement if available and enabled
+      if (useAI && isAIAvailable()) {
+        const categoryList = Object.values(categories.expense || [])
+          .concat(Object.values(categories.income || []))
+          .concat(Object.values(categories.investment || []));
+        
+        transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts);
+      }
+
+      // Map categories with pattern learning
+      const transactionsWithCategoryMapping = await Promise.all(transactions.map(async (t) => {
         const categoryList = Object.values(categories[t.type] || []);
         
-        // Try AI suggestion
+        // Try AI suggestion first
         let matchedCategory = null;
         let suggestionSource = null;
+        
         if (t.aiSuggestedCategory) {
           matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
           suggestionSource = 'ai';
+        }
+        
+        // If no AI suggestion, try pattern learning from history
+        if (!matchedCategory && user && user.id) {
+          const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
+          const historyMatch = await suggestCategoryFromHistory(user.id, t.description);
+          
+          if (historyMatch && historyMatch.confidence > 0.5) {
+            matchedCategory = categoryList.find(c => c.id === historyMatch.categoryId);
+            suggestionSource = 'history';
+          }
         }
         
         // Auto-assign account or card based on payment method with intelligent fallback
@@ -307,7 +328,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           card_id: defaultCardId,
           needsReview: needsReview // Marcar transações que precisam de revisão manual
         };
-      });
+      }));
 
       const validation = {
         valid: true,
@@ -324,7 +345,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           totalRows: 1,
           extractedTransactions: 1,
           validTransactions: 1,
-          aiEnhanced: true
+          aiEnhanced: useAI && isAIAvailable()
         }
       });
       

@@ -56,6 +56,9 @@ describe('ImportModal - Photo Processing Button', () => {
       apiKey: 'test-api-key',
       model: 'gemini-pro'
     });
+    
+    // Mock AI enhancement - return transactions as-is
+    aiService.enhanceTransactionsWithAI.mockImplementation(async (transactions) => transactions);
   });
 
   test('button should be present when photo mode is selected', () => {
