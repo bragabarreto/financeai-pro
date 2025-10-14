@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
 import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
-import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus } from '../../services/import/aiService';
+import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus, getAIConfig } from '../../services/import/aiService';
 import { extractFromPhoto } from '../../services/import/photoExtractorAI';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
@@ -214,6 +214,13 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       return;
     }
 
+    // Get AI configuration
+    const aiConfig = getAIConfig();
+    if (!aiConfig) {
+      setError('Configuração de IA não encontrada. Por favor, configure a IA em Configurações → Configuração de IA');
+      return;
+    }
+
     // Validar se usuário tem contas ou cartões cadastrados
     if (accounts.length === 0 && cards.length === 0) {
       setError(
@@ -228,7 +235,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
     try {
       // Extract transaction from photo
-      const transaction = await extractFromPhoto(photoFile, cards);
+      const transaction = await extractFromPhoto(photoFile, aiConfig, cards);
       
       if (!transaction) {
         setError('Não foi possível extrair dados da foto. Tente outra imagem.');
@@ -324,7 +331,24 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       setEditingTransactions(transactionsWithCategoryMapping);
       setStep(2);
     } catch (err) {
-      setError(err.message || 'Erro ao processar foto');
+      console.error('Erro ao processar foto:', err);
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Erro ao processar foto';
+      
+      if (err.message.includes('API error') || err.message.includes('API key')) {
+        errorMessage = 'Erro na API de IA. Verifique se sua chave de API está correta em Configurações → Configuração de IA';
+      } else if (err.message.includes('rate limit') || err.message.includes('quota')) {
+        errorMessage = 'Limite de uso da API de IA atingido. Tente novamente mais tarde ou use outra chave de API';
+      } else if (err.message.includes('network') || err.message.includes('fetch')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
+      } else if (err.message.includes('JSON')) {
+        errorMessage = 'Erro ao interpretar resposta da IA. A imagem pode não conter dados de transação válidos. Tente outra foto';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

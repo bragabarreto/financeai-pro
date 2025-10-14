@@ -152,6 +152,11 @@ IMPORTANTE:
     
     const extracted = JSON.parse(jsonText);
     
+    // Validate required fields
+    if (!extracted.description || !extracted.amount || !extracted.type) {
+      throw new Error('A IA não conseguiu extrair todas as informações necessárias da foto. Tente uma imagem mais clara ou com melhor qualidade');
+    }
+    
     // Match card_id based on last_digits
     if (extracted.card_last_digits && !extracted.card_id) {
       const matchedCard = cards.find(card => {
@@ -176,6 +181,12 @@ IMPORTANTE:
     
   } catch (error) {
     console.error('Erro ao extrair com IA Vision:', error);
+    
+    // Provide more specific error messages
+    if (error.message.includes('JSON')) {
+      throw new Error('A IA não conseguiu extrair dados válidos da imagem. Certifique-se de que a foto contém um comprovante, recibo ou notificação de transação financeira');
+    }
+    
     throw error;
   }
 };
