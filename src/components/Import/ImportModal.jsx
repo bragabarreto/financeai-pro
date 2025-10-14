@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Upload, FileText, AlertCircle, CheckCircle, 
   Loader, Download, Eye, Edit2, Trash2, Save,
-  AlertTriangle, MessageSquare, Sparkles
+  AlertTriangle, MessageSquare, Sparkles, DollarSign
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
 import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
 import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus, getAIConfig } from '../../services/import/aiService';
 import { extractFromPhoto } from '../../services/import/photoExtractorAI';
+import { extractFromPaycheck } from '../../services/import/paycheckExtractorAI';
 import { useAIConfig, checkAIAvailability } from '../../hooks/useAIConfig';
+import PaycheckPreview from './PaycheckPreview';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
   // Carregar configuração de IA do Supabase automaticamente
@@ -24,9 +26,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [showBulkEdit, setShowBulkEdit] = useState(false);
-  const [importMode, setImportMode] = useState('file'); // 'file', 'text', or 'photo'
+  const [importMode, setImportMode] = useState('file'); // 'file', 'text', 'photo', or 'paycheck'
   const [smsText, setSmsText] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
+  const [paycheckFile, setPaycheckFile] = useState(null);
+  const [paycheckData, setPaycheckData] = useState(null);
   const [useAI, setUseAI] = useState(isAIAvailable());
   
   // Atualizar useAI quando aiConfig carregar
@@ -70,6 +74,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setImportMode('file');
     setSmsText('');
     setPhotoFile(null);
+    setPaycheckFile(null);
+    setPaycheckData(null);
   };
 
   const handleFileSelect = (e) => {
@@ -382,6 +388,93 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
       } else if (err.message.includes('JSON')) {
         errorMessage = 'Erro ao interpretar resposta da IA. A imagem pode não conter dados de transação válidos. Tente outra foto';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProcessPaycheck = async () => {
+    if (!paycheckFile) {
+      setError('Selecione um arquivo de contracheque (PDF ou imagem)');
+      return;
+    }
+
+    // Verificar se IA está configurada
+    if (!aiConfig || !isConfigured) {
+      setError(
+        'Extração de contracheques requer IA configurada. ' +
+        'Vá em Configurações → Configuração de IA para configurar sua chave de API.'
+      );
+      return;
+    }
+    
+    console.log('🔄 Processando contracheque com configuração:', {
+      provider: aiConfig.provider,
+      model: aiConfig.model,
+      enabled: aiConfig.enabled
+    });
+
+    // Validar se usuário tem contas cadastradas
+    if (accounts.length === 0) {
+      setError(
+        'Você precisa cadastrar pelo menos uma conta bancária antes de importar contracheques. ' +
+        'Vá para a aba "Contas" para cadastrar.'
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Extrair dados do contracheque
+      const categoryList = Object.values(categories.expense || [])
+        .concat(Object.values(categories.income || []));
+      
+      const result = await extractFromPaycheck(paycheckFile, aiConfig, categoryList);
+      
+      if (!result || !result.transactions || result.transactions.length === 0) {
+        setError('Não foi possível extrair dados do contracheque. Verifique se o arquivo é válido.');
+        return;
+      }
+
+      console.log(`✅ ${result.transactions.length} transações extraídas do contracheque`);
+
+      // Atribuir conta padrão para transações sem conta
+      const primaryAccount = accounts.find(a => a.is_primary) || accounts[0];
+      const transactionsWithAccounts = result.transactions.map(t => ({
+        ...t,
+        account_id: t.account_id || primaryAccount.id
+      }));
+
+      // Salvar dados do contracheque para o preview
+      setPaycheckData({
+        ...result,
+        transactions: transactionsWithAccounts
+      });
+      
+      setEditingTransactions(transactionsWithAccounts);
+      setStep(2);
+    } catch (err) {
+      console.error('Erro ao processar contracheque:', err);
+      
+      let errorMessage = 'Erro ao processar contracheque';
+      
+      if (err.message.includes('API error') || err.message.includes('API key')) {
+        errorMessage = 'Erro na API de IA. Verifique se sua chave de API está correta em Configurações → Configuração de IA';
+      } else if (err.message.includes('rate limit') || err.message.includes('quota')) {
+        errorMessage = 'Limite de uso da API de IA atingido. Tente novamente mais tarde';
+      } else if (err.message.includes('network') || err.message.includes('fetch')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
+      } else if (err.message.includes('JSON')) {
+        errorMessage = 'Erro ao interpretar resposta da IA. O arquivo pode não ser um contracheque válido';
+      } else if (err.message.includes('Gemini')) {
+        errorMessage = 'Extração de contracheque requer Google Gemini. Configure em Configurações → Configuração de IA';
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -777,6 +870,19 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   <h3 className="font-semibold">Foto</h3>
                   <p className="text-sm text-gray-600 mt-1">Comprovantes e notificações</p>
                 </button>
+                
+                <button
+                  onClick={() => setImportMode('paycheck')}
+                  className={`flex-1 p-4 rounded-lg border-2 transition ${
+                    importMode === 'paycheck' 
+                      ? 'border-blue-600 bg-blue-50' 
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <DollarSign className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                  <h3 className="font-semibold">Contracheque</h3>
+                  <p className="text-sm text-gray-600 mt-1">PDF ou imagem</p>
+                </button>
               </div>
 
               {/* File Upload Mode */}
@@ -1000,11 +1106,120 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   </div>
                 </>
               )}
+
+              {/* Paycheck Upload Mode */}
+              {importMode === 'paycheck' && (
+                <>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                    <DollarSign className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2 text-center">
+                      Envie seu contracheque (PDF ou imagem)
+                    </h3>
+                    <p className="text-gray-600 mb-4 text-center text-sm">
+                      A IA irá extrair automaticamente todas as receitas e descontos
+                    </p>
+                    
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      onChange={(e) => setPaycheckFile(e.target.files[0])}
+                      className="hidden"
+                      id="paycheck-upload"
+                    />
+                    <label
+                      htmlFor="paycheck-upload"
+                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer mx-auto block w-fit"
+                    >
+                      <Upload className="w-5 h-5 mr-2" />
+                      Escolher Arquivo
+                    </label>
+                    
+                    {paycheckFile && (
+                      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <FileText className="w-8 h-8 text-blue-600 mr-3" />
+                            <div>
+                              <p className="font-semibold">{paycheckFile.name}</p>
+                              <p className="text-sm text-gray-600">
+                                {(paycheckFile.size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setPaycheckFile(null)}
+                            className="p-2 hover:bg-blue-100 rounded-lg"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(isConfigured || isAIAvailable()) && (
+                      <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                        <div className="flex items-center">
+                          <Sparkles className="w-5 h-5 text-purple-600 mr-2" />
+                          <span className="text-sm font-medium text-gray-800">
+                            Extração automática com IA
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {isConfigured ? (
+                            `IA configurada: ${aiConfig.provider} (${aiConfig.model || 'modelo padrão'})`
+                          ) : (
+                            'Configure a IA em Configurações para usar este recurso'
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-semibold mb-2">📊 O que será extraído:</h4>
+                    <ul className="text-sm text-gray-700 space-y-2">
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">💵 Receitas:</span> Salário, subsídio, auxílios, gratificações
+                      </li>
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">💸 Descontos:</span> INSS, IR, plano de saúde, empréstimos, pensão
+                      </li>
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">🎯 Categorização:</span> Automática baseada em suas categorias
+                      </li>
+                      <li className="bg-white p-2 rounded">
+                        <span className="font-medium">✏️ Edição:</span> Você poderá revisar e editar tudo antes de importar
+                      </li>
+                    </ul>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {/* Step 2: Preview */}
-          {step === 2 && processResult && (
+          {step === 2 && paycheckData && (
+            <div>
+              <PaycheckPreview
+                data={paycheckData}
+                categories={categories}
+                accounts={accounts}
+                cards={cards}
+                onTransactionsChange={(updatedTransactions) => {
+                  setEditingTransactions(updatedTransactions);
+                  setPaycheckData(prev => ({
+                    ...prev,
+                    transactions: updatedTransactions
+                  }));
+                }}
+                onValidationChange={(validation) => {
+                  console.log('📊 Validação atualizada:', validation);
+                }}
+              />
+            </div>
+          )}
+
+          {step === 2 && processResult && !paycheckData && (
             <div>
               <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
@@ -1437,12 +1652,14 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                 onClick={
                   importMode === 'file' ? handleProcessFile : 
                   importMode === 'text' ? handleProcessSMS : 
-                  handleProcessPhoto
+                  importMode === 'photo' ? handleProcessPhoto :
+                  handleProcessPaycheck
                 }
                 disabled={
                   (importMode === 'file' && !file) || 
                   (importMode === 'text' && !smsText.trim()) || 
-                  (importMode === 'photo' && !photoFile) || 
+                  (importMode === 'photo' && !photoFile) ||
+                  (importMode === 'paycheck' && !paycheckFile) ||
                   loading
                 }
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
@@ -1457,7 +1674,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                     <Eye className="w-5 h-5 mr-2" />
                     {importMode === 'file' ? 'Processar Arquivo' : 
                      importMode === 'text' ? 'Processar SMS' : 
-                     'Processar Foto'}
+                     importMode === 'photo' ? 'Processar Foto' :
+                     'Processar Contracheque'}
                   </>
                 )}
               </button>
