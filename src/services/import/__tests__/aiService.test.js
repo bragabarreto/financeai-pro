@@ -7,7 +7,8 @@ import {
   getAvailableProviders,
   getAIStatus,
   enhanceTransactionWithAI,
-  enhanceTransactionsWithAI
+  enhanceTransactionsWithAI,
+  getAIConfig
 } from '../aiService';
 
 // Mock fetch
@@ -116,6 +117,73 @@ describe('AI Service', () => {
     it('deve retornar entrada inalterada para não-array', async () => {
       const result = await enhanceTransactionsWithAI(null, []);
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getAIConfig', () => {
+    beforeEach(() => {
+      // Clear localStorage before each test
+      localStorage.clear();
+    });
+
+    it('deve retornar null quando não há configuração no localStorage', () => {
+      const config = getAIConfig();
+      expect(config).toBeNull();
+    });
+
+    it('deve retornar null quando configuração está desabilitada', () => {
+      localStorage.setItem('ai_config', JSON.stringify({
+        enabled: false,
+        provider: 'gemini',
+        apiKey: 'test-key',
+        model: 'gemini-2.5-flash'
+      }));
+
+      const config = getAIConfig();
+      expect(config).toBeNull();
+    });
+
+    it('deve retornar null quando falta apiKey', () => {
+      localStorage.setItem('ai_config', JSON.stringify({
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-2.5-flash'
+      }));
+
+      const config = getAIConfig();
+      expect(config).toBeNull();
+    });
+
+    it('deve retornar null quando falta provider', () => {
+      localStorage.setItem('ai_config', JSON.stringify({
+        enabled: true,
+        apiKey: 'test-key',
+        model: 'gemini-2.5-flash'
+      }));
+
+      const config = getAIConfig();
+      expect(config).toBeNull();
+    });
+
+    it('deve retornar configuração válida quando todos os campos estão presentes', () => {
+      const validConfig = {
+        enabled: true,
+        provider: 'gemini',
+        apiKey: 'test-key',
+        model: 'gemini-2.5-flash'
+      };
+      
+      localStorage.setItem('ai_config', JSON.stringify(validConfig));
+
+      const config = getAIConfig();
+      expect(config).toEqual(validConfig);
+    });
+
+    it('deve retornar null quando JSON é inválido', () => {
+      localStorage.setItem('ai_config', 'invalid-json');
+
+      const config = getAIConfig();
+      expect(config).toBeNull();
     });
   });
 });
