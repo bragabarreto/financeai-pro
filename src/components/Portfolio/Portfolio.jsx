@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, TrendingUp, PieChart, DollarSign, Calendar } from 'lucide-react';
+import { parseLocalDate, formatBrazilianDate } from '../../utils/dateUtils';
 
 const Portfolio = ({ transactions, categories, onBack }) => {
   // Group investment transactions by category
@@ -28,8 +29,7 @@ const Portfolio = ({ transactions, categories, onBack }) => {
   const totalPortfolio = investmentGroups.reduce((acc, group) => acc + group.currentBalance, 0);
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
+    return formatBrazilianDate(dateString);
   };
 
   return (
@@ -126,7 +126,7 @@ const Portfolio = ({ transactions, categories, onBack }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {group.transactions
-                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                      .sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date))
                       .map((transaction) => (
                         <tr key={transaction.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 text-sm">

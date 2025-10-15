@@ -1,5 +1,6 @@
 import React from 'react';
 import { Edit, Trash2, CreditCard, Building, Calendar, Tag, DollarSign } from 'lucide-react';
+import { parseLocalDate, formatBrazilianDate } from '../../utils/dateUtils';
 
 const TransactionList = ({ 
   transactions, 
@@ -18,10 +19,10 @@ const TransactionList = ({
     
     return transactions
       .filter(t => {
-        const transDate = new Date(t.date);
+        const transDate = parseLocalDate(t.date);
         return t.type === type && transDate >= thirtyDaysAgo;
       })
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+      .sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
   };
 
   const filteredTransactions = getLast30DaysTransactions();
@@ -56,8 +57,7 @@ const TransactionList = ({
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
+    return formatBrazilianDate(dateString);
   };
 
   if (filteredTransactions.length === 0) {

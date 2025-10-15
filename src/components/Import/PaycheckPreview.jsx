@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { formatBrazilianDate } from '../../utils/dateUtils';
 import {
   Edit2, Check, X, AlertTriangle, DollarSign, 
   TrendingUp, TrendingDown, Calendar, Tag, CreditCard, Building2
@@ -249,7 +250,7 @@ const PaycheckPreview = ({
           R$ {transaction.amount.toFixed(2)}
         </td>
         <td className="px-4 py-3 text-sm text-gray-600">
-          {new Date(transaction.date).toLocaleDateString('pt-BR')}
+          {formatBrazilianDate(transaction.date)}
         </td>
         <td className="px-4 py-3">
           {currentCategory ? (
@@ -307,7 +308,7 @@ const PaycheckPreview = ({
           <div>
             <p className="text-sm text-gray-600">Data de Crédito</p>
             <p className="font-semibold">
-              {new Date(data.metadata.payment_date).toLocaleDateString('pt-BR')}
+              {formatBrazilianDate(data.metadata.payment_date)}
             </p>
           </div>
         </div>

@@ -33,7 +33,8 @@ const AlimonyWidget = ({ user, transactions }) => {
 
       const monthTotal = transactions
         .filter(t => {
-          const tDate = new Date(t.date);
+          const [y, m, d] = String(t.date).split('-').map(Number);
+          const tDate = new Date(y, (m || 1) - 1, d || 1);
           return t.is_alimony && 
                  tDate >= monthStart && 
                  tDate <= monthEnd;

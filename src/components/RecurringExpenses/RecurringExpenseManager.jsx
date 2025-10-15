@@ -472,7 +472,7 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
               ) : (
                 <span className="flex items-center">
                   <Calendar className="w-3 h-3 mr-1" />
-                  Até {format(new Date(expense.end_date), 'dd/MM/yyyy')}
+                  Até {expense.end_date ? format(new Date(expense.end_date + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
                 </span>
               )}
             </div>
