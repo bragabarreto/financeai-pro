@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, AlertCircle, Upload, Check, Edit2, FileText } from 'lucide-react';
 import { extractTransactionsFromFile, categorizeTransactions } from '../../services/aiExtractor';
-import { formatDateLocal } from '../../utils/dateUtils';Extractor';
+import { formatDateLocal, formatBrazilianDate } from '../../utils/dateUtils';
 
 const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) => {
   const [step, setStep] = useState('upload'); // upload, preview, processing
@@ -356,7 +356,7 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                               />
                               {transaction.installment_count > 0 && transaction.last_installment_date && (
                                 <div className="text-xs text-gray-600">
-                                  até {new Date(transaction.last_installment_date).toLocaleDateString('pt-BR')}
+                                  até {formatBrazilianDate(transaction.last_installment_date)}
                                 </div>
                               )}
                             </div>

@@ -527,7 +527,8 @@ const loadCards = async () => {
     const currentYear = new Date().getFullYear();
 
     transactions.forEach(transaction => {
-      const transDate = new Date(transaction.date);
+      const [y, m, d] = String(transaction.date).split('-').map(Number);
+      const transDate = new Date(y, (m || 1) - 1, d || 1);
       if (transDate.getMonth() === currentMonth && transDate.getFullYear() === currentYear) {
         if (transaction.type === 'expense') {
           totals.expenses += transaction.amount;

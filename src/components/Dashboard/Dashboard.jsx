@@ -28,7 +28,8 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
     
     const now = new Date();
     const filtered = transactions.filter(t => {
-      const tDate = new Date(t.date);
+      const [y, m, d] = String(t.date).split('-').map(Number);
+      const tDate = new Date(y, (m || 1) - 1, d || 1);
       if (period === 'month') {
         return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
       }
@@ -66,7 +67,8 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
     for (let i = 5; i >= 0; i--) {
       const date = subMonths(new Date(), i);
       const monthTransactions = transactions.filter(t => {
-        const tDate = new Date(t.date);
+        const [y, m, d] = String(t.date).split('-').map(Number);
+        const tDate = new Date(y, (m || 1) - 1, d || 1);
         return tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
       });
 

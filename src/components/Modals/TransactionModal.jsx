@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Users } from 'lucide-react';
-import { getTodayLocalDate, formatDateLocal } from '../../utils/dateUtils';
+import { getTodayLocalDate, formatDateLocal, formatBrazilianDate } from '../../utils/dateUtils';
 
 // Transaction Modal Component - Fixed: payment_method, dates, account selection
 
@@ -379,8 +379,8 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
                 </div>
                 {formData.installment_count > 0 && formData.last_installment_date && (
                   <div className="text-xs text-blue-700 bg-blue-100 p-2 rounded">
-                    <p><strong>Data da primeira parcela:</strong> {new Date(formData.date).toLocaleDateString('pt-BR')}</p>
-                    <p><strong>Data da última parcela:</strong> {new Date(formData.last_installment_date).toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Data da primeira parcela:</strong> {formatBrazilianDate(formData.date)}</p>
+                    <p><strong>Data da última parcela:</strong> {formatBrazilianDate(formData.last_installment_date)}</p>
                     <p><strong>Total de parcelas:</strong> {formData.installment_count}x de R$ {(formData.amount / formData.installment_count).toFixed(2)}</p>
                   </div>
                 )}
