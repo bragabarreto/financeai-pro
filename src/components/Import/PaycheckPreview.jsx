@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { formatBrazilianDate } from '../../utils/dateUtils';
+import { formatBrazilianDate, formatDateLocal } from '../../utils/dateUtils';
 import {
   Edit2, Check, X, AlertTriangle, DollarSign, 
   TrendingUp, TrendingDown, Calendar, Tag, CreditCard, Building2
@@ -90,8 +90,20 @@ const PaycheckPreview = ({
 
   // Salvar edição
   const saveEdit = () => {
+    // If installment data present, ensure calculated fields are coherent
+    const updatedEditForm = { ...editForm };
+    if (!updatedEditForm.is_installment) {
+      updatedEditForm.installment_count = null;
+      updatedEditForm.installment_due_dates = [];
+      updatedEditForm.last_installment_date = null;
+    } else if (updatedEditForm.is_installment && updatedEditForm.installment_count && updatedEditForm.date) {
+      const dates = calculateInstallmentDates(updatedEditForm.date, parseInt(updatedEditForm.installment_count));
+      updatedEditForm.installment_due_dates = dates;
+      updatedEditForm.last_installment_date = dates[dates.length - 1];
+    }
+
     setTransactions(prev => 
-      prev.map(t => t.id === editingId ? { ...editForm, manuallyEdited: true } : t)
+      prev.map(t => t.id === editingId ? { ...updatedEditForm, manuallyEdited: true } : t)
     );
     setEditingId(null);
     setEditForm({});
@@ -99,7 +111,37 @@ const PaycheckPreview = ({
 
   // Atualizar campo do formulário
   const updateField = (field, value) => {
-    setEditForm(prev => ({ ...prev, [field]: value }));
+    setEditForm(prev => {
+      const next = { ...prev, [field]: value };
+      // Reset installment fields if toggled off
+      if (field === 'is_installment' && !value) {
+        next.installment_count = null;
+        next.installment_due_dates = [];
+        next.last_installment_date = null;
+      }
+      // Recalculate dates if count or date changes and installment is enabled
+      if ((field === 'installment_count' || field === 'date') && next.is_installment) {
+        const count = parseInt(field === 'installment_count' ? value : next.installment_count) || 0;
+        if (count > 0 && next.date) {
+          const dates = calculateInstallmentDates(next.date, count);
+          next.installment_due_dates = dates;
+          next.last_installment_date = dates[dates.length - 1];
+        }
+      }
+      return next;
+    });
+  };
+
+  // Helper to calculate installment dates
+  const calculateInstallmentDates = (startDate, count) => {
+    const dates = [];
+    const baseDate = new Date(startDate);
+    for (let i = 0; i < count; i++) {
+      const installmentDate = new Date(baseDate);
+      installmentDate.setMonth(baseDate.getMonth() + i);
+      dates.push(formatDateLocal(installmentDate));
+    }
+    return dates;
   };
 
   // Toggle seleção
@@ -185,6 +227,36 @@ const PaycheckPreview = ({
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
+            {/* Parcelamento controls */}
+            <div className="mt-3 p-2 bg-blue-100 rounded">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={currentData.is_installment || false}
+                  onChange={(e) => updateField('is_installment', e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span>Transação Parcelada</span>
+              </label>
+              {currentData.is_installment && (
+                <div className="mt-2 space-y-1">
+                  <input
+                    type="number"
+                    min="2"
+                    max="48"
+                    value={currentData.installment_count || ''}
+                    onChange={(e) => updateField('installment_count', parseInt(e.target.value) || '')}
+                    className="w-24 px-2 py-1 border rounded text-sm"
+                    placeholder="12"
+                  />
+                  {currentData.installment_count > 0 && currentData.last_installment_date && (
+                    <div className="text-xs text-blue-800">
+                      até {formatBrazilianDate(currentData.last_installment_date)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </td>
           <td className="px-4 py-3">
             <select

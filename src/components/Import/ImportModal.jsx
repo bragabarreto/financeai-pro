@@ -5,6 +5,7 @@ import {
   AlertTriangle, MessageSquare, Sparkles, DollarSign
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
+import { formatDateLocal, formatBrazilianDate } from '../../utils/dateUtils';
 import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
 import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus, getAIConfig } from '../../services/import/aiService';
 import { extractFromPhoto } from '../../services/import/photoExtractorAI';
@@ -116,12 +117,17 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         return;
       }
 
-      // Add confidence scores and initialize is_alimony
+      // Add confidence scores and initialize extra flags (alimony, installments)
       transactions = transactions.map(t => ({
         ...t,
         confidence: calculateSMSConfidence(t),
         selected: true,
-        is_alimony: false
+        is_alimony: false,
+        // Installment defaults
+        is_installment: t.is_installment || false,
+        installment_count: t.installment_count || null,
+        installment_due_dates: t.installment_due_dates || [],
+        last_installment_date: t.last_installment_date || null
       }));
 
       // Use AI enhancement if available and enabled
@@ -197,7 +203,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           manuallyEdited: false,
           account_id: defaultAccountId,
           card_id: defaultCardId,
-          needsReview: needsReview // Marcar transações que precisam de revisão manual
+          needsReview: needsReview, // Marcar transações que precisam de revisão manual
+          // Ensure installment fields exist in preview
+          is_installment: t.is_installment || false,
+          installment_count: t.installment_count || null,
+          installment_due_dates: t.installment_due_dates || [],
+          last_installment_date: t.last_installment_date || null
         };
       }));
 
@@ -268,12 +279,17 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       // Wrap in array for consistency
       let transactions = [transaction];
 
-      // Add confidence scores and initialize is_alimony
+      // Add confidence scores and initialize extra flags (alimony, installments)
       transactions = transactions.map(t => ({
         ...t,
         confidence: t.confidence || 90,
         selected: true,
-        is_alimony: false
+        is_alimony: false,
+        // Installment defaults
+        is_installment: t.is_installment || false,
+        installment_count: t.installment_count || null,
+        installment_due_dates: t.installment_due_dates || [],
+        last_installment_date: t.last_installment_date || null
       }));
 
       // Use AI enhancement if available and enabled
@@ -349,7 +365,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           manuallyEdited: false,
           account_id: defaultAccountId,
           card_id: defaultCardId,
-          needsReview: needsReview // Marcar transações que precisam de revisão manual
+          needsReview: needsReview, // Marcar transações que precisam de revisão manual
+          // Ensure installment fields exist in preview
+          is_installment: t.is_installment || false,
+          installment_count: t.installment_count || null,
+          installment_due_dates: t.installment_due_dates || [],
+          last_installment_date: t.last_installment_date || null
         };
       }));
 
@@ -449,7 +470,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       const primaryAccount = accounts.find(a => a.is_primary) || accounts[0];
       const transactionsWithAccounts = result.transactions.map(t => ({
         ...t,
-        account_id: t.account_id || primaryAccount.id
+        account_id: t.account_id || primaryAccount.id,
+        // Ensure installment fields exist in preview
+        is_installment: t.is_installment || false,
+        installment_count: t.installment_count || null,
+        installment_due_dates: t.installment_due_dates || [],
+        last_installment_date: t.last_installment_date || null
       }));
 
       // Salvar dados do contracheque para o preview
@@ -566,7 +592,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           account_id: defaultAccountId,
           card_id: defaultCardId,
           is_alimony: false,
-          needsReview: needsReview // Marcar transações que precisam de revisão manual
+          needsReview: needsReview, // Marcar transações que precisam de revisão manual
+          // Ensure installment fields exist in preview
+          is_installment: t.is_installment || false,
+          installment_count: t.installment_count || null,
+          installment_due_dates: t.installment_due_dates || [],
+          last_installment_date: t.last_installment_date || null
         };
       });
 
@@ -693,6 +724,18 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     }
   };
 
+  // Helper function to calculate installment dates
+  const calculateInstallmentDates = (startDate, count) => {
+    const dates = [];
+    const date = new Date(startDate);
+    for (let i = 0; i < count; i++) {
+      const installmentDate = new Date(date);
+      installmentDate.setMonth(date.getMonth() + i);
+      dates.push(formatDateLocal(installmentDate));
+    }
+    return dates;
+  };
+
   const handleTransactionEdit = (index, field, value) => {
     const updated = [...editingTransactions];
     updated[index][field] = value;
@@ -709,6 +752,22 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         const selectedCategory = categoryList.find(c => c.id === value);
         updated[index].category = selectedCategory ? selectedCategory.name : value;
         updated[index].categoryId = value;
+      }
+    }
+
+    // If updating installment-related fields, recalculate dates
+    if (field === 'is_installment' && !value) {
+      // Reset installment fields when unchecking
+      updated[index].installment_count = null;
+      updated[index].installment_due_dates = [];
+      updated[index].last_installment_date = null;
+    } else if (field === 'installment_count' || (field === 'date' && updated[index].is_installment)) {
+      const count = field === 'installment_count' ? parseInt(value) : updated[index].installment_count;
+      const startDate = field === 'date' ? value : updated[index].date;
+      if (count && count > 0 && startDate) {
+        const dates = calculateInstallmentDates(startDate, count);
+        updated[index].installment_due_dates = dates;
+        updated[index].last_installment_date = dates[dates.length - 1];
       }
     }
     
@@ -1380,6 +1439,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                       <th className="p-2 text-left">Categoria</th>
                       <th className="p-2 text-left">Meio Pgto.</th>
                       <th className="p-2 text-left">Forma de Pagamento</th>
+                      <th className="p-2 text-left">Parcelado</th>
+                      <th className="p-2 text-left">Parcelas</th>
                       <th className="p-2 text-left">Pensão</th>
                       <th className="p-2 text-left">Confiança</th>
                       <th className="p-2 text-left w-10"></th>
@@ -1443,7 +1504,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                             <option value="">Selecione...</option>
                             {Object.values(categories[transaction.type] || []).map(cat => (
                               <option key={cat.id} value={cat.id}>
-                                {cat.name}{transaction.isSuggestion && !transaction.manuallyEdited && transaction.categoryId === cat.id ? ' (sugerido)' : ''}
+                                {cat.name}
                               </option>
                             ))}
                           </select>
@@ -1544,6 +1605,39 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                             </div>
                           ) : (
                             <span className="text-xs text-gray-500">N/A</span>
+                          )}
+                        </td>
+                        {/* Parcelado */}
+                        <td className="p-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={transaction.is_installment || false}
+                            onChange={(e) => handleTransactionEdit(index, 'is_installment', e.target.checked)}
+                            className="w-4 h-4"
+                            title="Transação Parcelada"
+                          />
+                        </td>
+                        {/* Parcelas */}
+                        <td className="p-2">
+                          {transaction.is_installment ? (
+                            <div className="space-y-1">
+                              <input
+                                type="number"
+                                min="2"
+                                max="48"
+                                value={transaction.installment_count || ''}
+                                onChange={(e) => handleTransactionEdit(index, 'installment_count', parseInt(e.target.value))}
+                                className="w-16 p-1 border rounded text-xs"
+                                placeholder="12"
+                              />
+                              {transaction.installment_count > 0 && transaction.last_installment_date && (
+                                <div className="text-[10px] text-gray-600">
+                                  até {formatBrazilianDate(transaction.last_installment_date)}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
                           )}
                         </td>
                         <td className="p-2 text-center">
