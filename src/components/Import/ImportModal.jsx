@@ -198,6 +198,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         return {
           ...t,
           categoryId: matchedCategory?.id || null,
+          // Normalize category name to exactly match registered option
+          category: matchedCategory?.name || (t.category ?? null),
           isSuggestion: !!matchedCategory,
           suggestionSource: suggestionSource, // 'ai', 'history', or null
           manuallyEdited: false,
@@ -360,6 +362,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         return {
           ...t,
           categoryId: matchedCategory?.id || null,
+          // Normalize category name to exactly match registered option
+          category: matchedCategory?.name || (t.category ?? null),
           isSuggestion: !!matchedCategory,
           suggestionSource: suggestionSource, // 'ai', 'history', or null
           manuallyEdited: false,
@@ -586,6 +590,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         return {
           ...t,
           categoryId: matchedCategory ? matchedCategory.id : null,
+          // Normalize category name to the exact registered option (avoid variants)
+          category: matchedCategory ? matchedCategory.name : (t.category ?? null),
           isSuggestion: matchedCategory ? true : false, // Mark as suggestion if auto-categorized
           manuallyEdited: false,
           selected: true,
@@ -613,6 +619,32 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           cards,
           accounts
         );
+
+        // Normalize AI suggestions to match existing categories exactly
+        transactionsWithCategoryMapping = transactionsWithCategoryMapping.map(t => {
+          // Skip if already has a categoryId
+          if (t.categoryId) return t;
+          const typeCategories = Object.values(categories[t.type] || []);
+          // Prefer type-specific list; if not found, fallback to any list
+          let matched = typeCategories.find(c => c.id === t.aiSuggestedCategory);
+          if (!matched) {
+            const allCats = Object.values(categories.expense || [])
+              .concat(Object.values(categories.income || []))
+              .concat(Object.values(categories.investment || []));
+            matched = allCats.find(c => c.id === t.aiSuggestedCategory);
+          }
+          if (matched) {
+            return {
+              ...t,
+              categoryId: matched.id,
+              category: matched.name,
+              isSuggestion: true,
+              suggestionSource: 'ai',
+              manuallyEdited: false
+            };
+          }
+          return t;
+        });
       }
       
       // Apply pattern learning to transactions without AI suggestions
@@ -698,18 +730,21 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setError('');
 
     try {
-      // Create category mapping
+      // Create category mapping (normalized for robust lookups)
       const categoryMapping = {};
       Object.values(categories).flat().forEach(cat => {
-        categoryMapping[cat.name.toLowerCase()] = cat.id;
-        categoryMapping[cat.name] = cat.id;
+        const exact = (cat.name || '').trim();
+        const lower = exact.toLowerCase();
+        categoryMapping[lower] = cat.id;
+        categoryMapping[exact] = cat.id;
       });
 
       // Use the first account as fallback (not used since we validate above)
       const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
 
       const result = await importTransactions(
-        selectedTransactions,
+        // Ensure we rely on categoryId primarily to avoid name variance
+        selectedTransactions.map(t => ({ ...t })),
         user.id,
         fallbackAccountId,
         categoryMapping
