@@ -206,8 +206,15 @@ export const importTransactions = async (transactions, userId, accountId, catego
   
   for (const transaction of transactions) {
     try {
-      // Map category name to ID if available
-      const categoryId = categoryMapping[transaction.category] || null;
+      // Resolve category ID: prefer explicit categoryId, otherwise map from name
+      let categoryId = null;
+      if (transaction.categoryId) {
+        categoryId = transaction.categoryId;
+      } else if (transaction.category) {
+        const nameExact = String(transaction.category);
+        const nameLower = nameExact.toLowerCase();
+        categoryId = categoryMapping[nameExact] || categoryMapping[nameLower] || null;
+      }
       
       // Determine the correct account_id or card_id based on payment method
       const finalAccountId = transaction.card_id ? null : (transaction.account_id || accountId);
