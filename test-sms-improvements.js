@@ -55,6 +55,25 @@ console.log('  💳 Cartão (últimos 4):', result2.card_last_digits);
 console.log('  📊 Categoria:', categorizeTransaction(result2.description));
 console.log('');
 
+// Teste 2.1: Exemplo Santander fornecido pelo usuário
+console.log('📝 TESTE 2.1: Extração de SMS Santander (cartão de crédito)');
+console.log('─────────────────────────────────────────────────────────────\n');
+
+const sms2_1 = 'Compra no cartão final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada.';
+console.log('SMS Original:');
+console.log(`"${sms2_1}"\n`);
+
+const result2_1 = extractFromSMS(sms2_1);
+console.log('Dados Extraídos:');
+console.log('  🏪 Estabelecimento:', result2_1?.description);
+console.log('  💰 Valor: R$', result2_1?.amount?.toFixed ? result2_1.amount.toFixed(2) : result2_1?.amount);
+console.log('  📅 Data:', result2_1?.date);
+console.log('  🏦 Banco:', result2_1?.bank_name);
+console.log('  💳 Cartão (últimos 4):', result2_1?.card_last_digits);
+console.log('  ✅ Tipo:', result2_1?.type);
+console.log('  💳 Meio de Pagamento:', result2_1?.payment_method);
+console.log('');
+
 // Teste 3: Teste de categorização melhorada
 console.log('📝 TESTE 3: Categorização Melhorada');
 console.log('─────────────────────────────────────────────────────────────\n');

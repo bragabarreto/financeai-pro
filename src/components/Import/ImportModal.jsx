@@ -1091,6 +1091,9 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                         <span className="font-medium">CAIXA:</span> Compra aprovada LOJA R$ 450,00 06/10 às 16:45
                       </li>
                       <li className="bg-white p-2 rounded">
+                        <span className="font-medium">Santander:</span> Compra no cartão final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada.
+                      </li>
+                      <li className="bg-white p-2 rounded">
                         <span className="font-medium">PIX:</span> Você recebeu um Pix de R$ 250,00 de João Silva
                       </li>
                       <li className="bg-white p-2 rounded">
