@@ -66,6 +66,8 @@
 │                                                              │
 │  💡 Exemplos de SMS suportados:                             │
 │  • CAIXA: Compra aprovada LOJA R$ 450,00 06/10 às 16:45   │
+│  • Santander: Compra no cartão final 0405, de R$ 66,00,    │
+│    em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada.     │
 │  • PIX: Você recebeu um Pix de R$ 250,00 de João Silva    │
 │  • Nubank: Compra aprovada: R$ 150,00 em RESTAURANTE XYZ  │
 │                                                              │

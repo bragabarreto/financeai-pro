@@ -60,6 +60,14 @@ const SMS_PATTERNS = {
     type: 'expense',
     paymentMethod: 'credit_card'
   },
+  // Santander (sem prefixo do banco):
+  // "Compra no cartão final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada."
+  // Captura dígitos do cartão, valor, data, hora e estabelecimento
+  santander_card: {
+    pattern: /Compra\s+no\s+cart[aã]o\s+final\s+(\d{4})\s*,?\s*de\s+R?\$?\s*([\d.,]+)\s*,?\s*em\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*,?\s*(?:[aà]s|as)\s+(\d{1,2}:\d{2})\s*,?\s*em\s+(.+?)(?:[,.]\s*)?(?:aprovad[ao])?/i,
+    type: 'expense',
+    paymentMethod: 'credit_card'
+  },
   // Nubank: Compra aprovada: R$ 150,00 em RESTAURANTE XYZ em 15/03
   nubank: {
     pattern: /(?:Nubank|Nu).*?Compra\s+(?:aprovada|realizada)[:\s]+R?\$?\s*([\d.,]+)\s+(?:em|no)\s+([^0-9]+?)(?:\s+em\s+(\d{1,2}\/\d{1,2}))?$/i,
@@ -252,6 +260,17 @@ export const extractFromSMS = (smsText) => {
         transaction.description = cleanDescription(match[1]);
         transaction.amount = parseAmount(match[2]);
         transaction.date = parseDate(match[3], match[4]);
+      } else if (patternName === 'santander_card') {
+        // For Santander SMS without explicit bank prefix, derive fields from groups
+        // match[1]=card last 4, [2]=amount, [3]=date, [4]=time, [5]=merchant
+        transaction.card_last_digits = match[1];
+        transaction.amount = parseAmount(match[2]);
+        transaction.date = parseDate(match[3], match[4]);
+        transaction.description = cleanDescription(match[5]);
+        // If bank name was not detected by prefix, set to SANTANDER for clarity
+        if (!transaction.bank_name) {
+          transaction.bank_name = 'SANTANDER';
+        }
       } else if (patternName === 'nubank') {
         transaction.amount = parseAmount(match[1]);
         transaction.description = cleanDescription(match[2]);

@@ -56,6 +56,10 @@ CAIXA: Compra aprovada em LOJA XYZ R$ 100,00 em 2 vezes,
 08/10 as 14:30, ELO final 1527
 ```
 
+```
+Santander: Compra no cartão final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada.
+```
+
 ### ✅ PIX Enviado
 ```
 Você enviou um Pix de R$ 50,00 para João Silva em 08/10 às 10:15
