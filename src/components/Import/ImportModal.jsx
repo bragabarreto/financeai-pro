@@ -270,8 +270,13 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setError('');
 
     try {
+      // Build category list for AI extraction
+      const categoryList = Object.values(categories.expense || [])
+        .concat(Object.values(categories.income || []))
+        .concat(Object.values(categories.investment || []));
+      
       // Extract transaction from photo
-      const transaction = await extractFromPhoto(photoFile, aiConfig, cards);
+      const transaction = await extractFromPhoto(photoFile, aiConfig, cards, categoryList);
       
       if (!transaction) {
         setError('Não foi possível extrair dados da foto. Tente outra imagem.');
@@ -296,10 +301,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
       // Use AI enhancement if available and enabled
       if (useAI && isAIAvailable()) {
-        const categoryList = Object.values(categories.expense || [])
-          .concat(Object.values(categories.income || []))
-          .concat(Object.values(categories.investment || []));
-        
         transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts);
       }
 

@@ -79,36 +79,14 @@ const extractCardDigits = (text) => {
 };
 
 /**
- * Extract card last digits from SMS
- * @param {string} text - SMS text
- * @returns {string|null} Last 4 digits or null
- */
-const extractCardDigits = (text) => {
-  const patterns = [
-    /final\s+(\d{4})/i,
-    /cart[aã]o\s+(?:final\s+)?(\d{4})/i,
-    /\*{4}\s*(\d{4})/,
-    /(\d{4})(?:\s*$|\s+[^0-9])/
-  ];
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      return match[1];
-    }
-  }
-  
-  return null;
-};
-
-/**
  * Extract transaction data from SMS using AI
  * @param {string} smsText - SMS text
  * @param {Object} aiConfig - AI configuration with provider and apiKey
  * @param {Array} cards - User's credit cards for matching
+ * @param {Array} availableCategories - List of user's registered categories
  * @returns {Promise<Object>} Extracted transaction data
  */
-export const extractFromSMSWithAI = async (smsText, aiConfig, cards = []) => {
+export const extractFromSMSWithAI = async (smsText, aiConfig, cards = [], availableCategories = []) => {
   if (!aiConfig || !aiConfig.apiKey) {
     throw new Error('Configuração de IA não fornecida');
   }
@@ -120,6 +98,12 @@ export const extractFromSMSWithAI = async (smsText, aiConfig, cards = []) => {
     }
     return digits.filter(d => d);
   });
+
+  // Build category list
+  const categoryNames = availableCategories.map(c => c.name).join(', ');
+  const categoryInstruction = categoryNames 
+    ? `categoria sugerida (escolha APENAS entre as categorias cadastradas: ${categoryNames})`
+    : `categoria sugerida (use "outros" se não houver categorias cadastradas)`;
 
   const prompt = `Você é um assistente especializado em extrair dados de transações financeiras de mensagens SMS bancárias brasileiras.
 
@@ -137,7 +121,7 @@ Retorne APENAS um objeto JSON válido com os seguintes campos:
   "amount": valor numérico da transação,
   "date": "data no formato YYYY-MM-DD",
   "type": "expense" ou "income" ou "investment",
-  "category": "categoria sugerida (alimentacao, transporte, compras, saude, lazer, salario, outros)",
+  "category": "${categoryInstruction}",
   "card_last_digits": "últimos 4 dígitos do cartão se mencionado, ou null",
   "card_id": "ID do cartão se os dígitos corresponderem a um cartão cadastrado, ou null",
   "installments": número de parcelas se mencionado ou 1,
@@ -147,7 +131,8 @@ Retorne APENAS um objeto JSON válido com os seguintes campos:
 
 IMPORTANTE:
 - Extraia o nome do estabelecimento de forma limpa (ex: "LA BRASILERIE" em vez de "em LA BRASILERIE")
-- Para estabelecimentos de alimentação (restaurantes, padarias, lanchonetes, etc.), use categoria "alimentacao"
+- A categoria DEVE ser escolhida SOMENTE entre as categorias cadastradas pelo usuário: ${categoryNames || 'outros'}
+- Se nenhuma categoria registrada se encaixar perfeitamente, escolha a mais próxima ou use "outros" se disponível
 - Se os últimos 4 dígitos do cartão corresponderem a algum dos cartões cadastrados, use o card_id correspondente
 - Para PIX recebido, type deve ser "income"
 - Para PIX enviado ou compras, type deve ser "expense"
@@ -395,9 +380,10 @@ const callClaude = async (prompt, apiKey, model) => {
  * @param {string} text - Text containing multiple SMS messages
  * @param {Object} aiConfig - AI configuration
  * @param {Array} cards - User's credit cards
+ * @param {Array} availableCategories - List of user's registered categories
  * @returns {Promise<Array>} Array of extracted transactions
  */
-export const extractMultipleFromText = async (text, aiConfig, cards = []) => {
+export const extractMultipleFromText = async (text, aiConfig, cards = [], availableCategories = []) => {
   // Split by common SMS separators
   const messages = text.split(/\n\n+|\r\n\r\n+/).filter(msg => msg.trim().length > 10);
   
@@ -405,7 +391,7 @@ export const extractMultipleFromText = async (text, aiConfig, cards = []) => {
   
   for (const message of messages) {
     try {
-      const extracted = await extractFromSMSWithAI(message, aiConfig, cards);
+      const extracted = await extractFromSMSWithAI(message, aiConfig, cards, availableCategories);
       if (extracted && extracted.amount > 0) {
         transactions.push(extracted);
       }

@@ -80,9 +80,10 @@ const fileToBase64 = (file) => {
  * @param {File} imageFile - Image file containing transaction receipt/notification
  * @param {Object} aiConfig - AI configuration with provider and apiKey
  * @param {Array} cards - User's credit cards for matching
+ * @param {Array} availableCategories - List of user's registered categories
  * @returns {Promise<Object>} Extracted transaction data
  */
-export const extractFromPhotoWithAI = async (imageFile, aiConfig, cards = []) => {
+export const extractFromPhotoWithAI = async (imageFile, aiConfig, cards = [], availableCategories = []) => {
   if (!aiConfig || !aiConfig.apiKey) {
     throw new Error('Configuração de IA não fornecida');
   }
@@ -94,6 +95,12 @@ export const extractFromPhotoWithAI = async (imageFile, aiConfig, cards = []) =>
     }
     return digits.filter(d => d);
   });
+
+  // Build category list by type
+  const categoryNames = availableCategories.map(c => c.name).join(', ');
+  const categoryInstruction = categoryNames 
+    ? `categoria sugerida (escolha APENAS entre as categorias cadastradas: ${categoryNames})`
+    : `categoria sugerida (use "outros" se não houver categorias cadastradas)`;
 
   const prompt = `Você é um assistente especializado em extrair dados de transações financeiras de imagens de comprovantes, notificações e recibos bancários brasileiros.
 
@@ -109,7 +116,7 @@ Retorne APENAS um objeto JSON válido com os seguintes campos:
   "time": "hora no formato HH:MM se disponível, ou null",
   "type": "expense" ou "income" ou "investment",
   "transaction_type": "tipo específico: pix, credit_card, debit_card, transfer, boleto",
-  "category": "categoria sugerida (alimentacao, transporte, compras, saude, lazer, salario, outros)",
+  "category": "${categoryInstruction}",
   "card_last_digits": "últimos 4 dígitos do cartão se visível, ou null",
   "card_id": "ID do cartão se os dígitos corresponderem a um cartão cadastrado, ou null",
   "beneficiary": "nome do beneficiário/recebedor se for PIX ou transferência, ou null",
@@ -125,6 +132,8 @@ IMPORTANTE:
 - Para PIX enviado (você pagou), type deve ser "expense" e preencha "beneficiary"
 - Para compras com cartão, type deve ser "expense"
 - Se os últimos 4 dígitos do cartão corresponderem a algum dos cartões cadastrados, use o card_id correspondente
+- A categoria DEVE ser escolhida SOMENTE entre as categorias cadastradas pelo usuário: ${categoryNames || 'outros'}
+- Se nenhuma categoria registrada se encaixar perfeitamente, escolha a mais próxima ou use "outros" se disponível
 - Valores devem ser numéricos (sem R$ ou formatação)
 - Datas devem estar no formato YYYY-MM-DD
 - Se a data tiver apenas DD/MM, use o ano atual (2025)
@@ -319,14 +328,15 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
  * @param {Array<File>} imageFiles - Array of image files
  * @param {Object} aiConfig - AI configuration
  * @param {Array} cards - User's credit cards
+ * @param {Array} availableCategories - List of user's registered categories
  * @returns {Promise<Array>} Array of extracted transactions
  */
-export const extractMultipleFromPhotos = async (imageFiles, aiConfig, cards = []) => {
+export const extractMultipleFromPhotos = async (imageFiles, aiConfig, cards = [], availableCategories = []) => {
   const transactions = [];
   
   for (const file of imageFiles) {
     try {
-      const extracted = await extractFromPhotoWithAI(file, aiConfig, cards);
+      const extracted = await extractFromPhotoWithAI(file, aiConfig, cards, availableCategories);
       if (extracted && extracted.amount > 0) {
         transactions.push(extracted);
       }
