@@ -134,8 +134,8 @@ const transaction = await extractFromPhoto(photoFile, aiConfig, cards, categoryL
 ### Importação de SMS:
 1. Usuário cola texto de SMS no ImportModal
 2. ImportModal coleta todas as categorias cadastradas do usuário
-3. Sistema processa SMS (pode usar extrator básico ou AI-powered)
-4. Se usar AI: `extractFromSMSWithAI` recebe as **categorias** disponíveis
+3. Sistema processa SMS (pode usar extrator básico ou com IA)
+4. Se usar IA: `extractFromSMSWithAI` recebe as **categorias** disponíveis
 5. Prompt é construído com apenas as categorias cadastradas
 6. IA retorna sugestão de categoria (limitada às opções fornecidas)
 7. Transação é mapeada para a categoria correspondente no banco de dados
