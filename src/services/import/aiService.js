@@ -212,6 +212,12 @@ export const enhanceTransactionWithAI = async (transaction, availableCategories 
     const cardNames = availableCards.map(c => c.name).join(', ');
     const accountNames = availableAccounts.map(a => a.name).join(', ');
     
+    // If no categories are registered, return transaction unchanged
+    if (!categoryNames) {
+      console.warn('No categories available for AI enhancement');
+      return transaction;
+    }
+    
     const prompt = `Analyze this financial transaction and suggest the best category and payment form:
 
 Transaction Details:
@@ -221,18 +227,20 @@ Transaction Details:
 - Payment Method: ${transaction.payment_method || 'N/A'}
 - Raw Text: ${transaction.raw_text || 'N/A'}
 
-Available Categories: ${categoryNames || 'alimentacao, transporte, moradia, saude, lazer, educacao, outros'}
+Available Categories: ${categoryNames}
 Available Cards: ${cardNames || 'None'}
 Available Accounts: ${accountNames || 'None'}
 
+IMPORTANT: You MUST select the category ONLY from the Available Categories list above. Do not suggest categories that are not in this list.
+
 Based on the payment method and description, identify:
-1. The most suitable category
+1. The most suitable category from the Available Categories list
 2. If payment_method is "credit_card", which card was likely used (match card name from description if possible)
 3. If payment_method is "debit_card", "pix", "transfer", etc., which account was likely used
 
 Provide your response in JSON format:
 {
-  "category": "suggested category name",
+  "category": "suggested category name (MUST be from Available Categories list)",
   "confidence": 0-100,
   "reasoning": "brief explanation",
   "suggested_card": "card name if credit_card payment, otherwise null",
