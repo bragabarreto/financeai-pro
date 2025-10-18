@@ -176,7 +176,8 @@ describe('ImportModal - Photo Processing Button', () => {
           provider: 'gemini',
           apiKey: 'test-api-key'
         }),
-        mockCards
+        mockCards,
+        expect.any(Array) // categories array
       );
     });
   });

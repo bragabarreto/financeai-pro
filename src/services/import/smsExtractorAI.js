@@ -79,29 +79,6 @@ const extractCardDigits = (text) => {
 };
 
 /**
- * Extract card last digits from SMS
- * @param {string} text - SMS text
- * @returns {string|null} Last 4 digits or null
- */
-const extractCardDigits = (text) => {
-  const patterns = [
-    /final\s+(\d{4})/i,
-    /cart[aã]o\s+(?:final\s+)?(\d{4})/i,
-    /\*{4}\s*(\d{4})/,
-    /(\d{4})(?:\s*$|\s+[^0-9])/
-  ];
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      return match[1];
-    }
-  }
-  
-  return null;
-};
-
-/**
  * Extract transaction data from SMS using AI
  * @param {string} smsText - SMS text
  * @param {Object} aiConfig - AI configuration with provider and apiKey
