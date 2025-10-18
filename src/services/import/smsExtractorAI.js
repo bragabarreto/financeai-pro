@@ -1,9 +1,11 @@
 /**
  * SMS/Text Transaction Extractor with AI Enhancement
  * Extracts transaction data from SMS notifications using AI
+ * Enhanced with historical pattern learning and better Brazilian format support
  */
 
 import { getTodayLocalDate } from '../../utils/dateUtils';
+import { suggestCategoryFromHistory } from './patternLearning';
 
 /**
  * Parse Brazilian currency format
@@ -79,14 +81,157 @@ const extractCardDigits = (text) => {
 };
 
 /**
- * Extract transaction data from SMS using AI
+ * Build enhanced AI prompt with user context
+ * @param {string} smsText - SMS text to analyze
+ * @param {Array} cardDigitsList - List of registered card digits
+ * @param {string} categoryNames - Comma-separated category names
+ * @param {Object} historicalContext - Historical transaction patterns
+ * @returns {string} Enhanced prompt
+ */
+const buildEnhancedPrompt = (smsText, cardDigitsList, categoryNames, historicalContext = {}) => {
+  const currentYear = new Date().getFullYear();
+  
+  let contextSection = '';
+  if (historicalContext.recentTransactions && historicalContext.recentTransactions.length > 0) {
+    contextSection = `\n\nCONTEXTO HISTÓRICO DO USUÁRIO (use para melhorar precisão):
+${historicalContext.recentTransactions.map(t => 
+  `- "${t.description}" → Categoria: ${t.category} (${t.type})`
+).join('\n')}`;
+  }
+  
+  return `Você é um assistente especializado em extrair dados de transações financeiras de mensagens SMS bancárias brasileiras.
+
+Sua tarefa é analisar SMS de bancos brasileiros e extrair informações financeiras com MÁXIMA PRECISÃO.
+
+ANALISE O SEGUINTE SMS:
+"""
+${smsText}
+"""
+
+CARTÕES CADASTRADOS PELO USUÁRIO (últimos 4 dígitos):
+${cardDigitsList.length > 0 ? cardDigitsList.join(', ') : 'Nenhum cartão cadastrado'}
+
+CATEGORIAS REGISTRADAS PELO USUÁRIO:
+${categoryNames || 'Nenhuma categoria registrada - use "outros"'}${contextSection}
+
+INSTRUÇÕES DETALHADAS:
+
+1. DESCRIÇÃO/ESTABELECIMENTO:
+   - Extraia o nome do estabelecimento ou beneficiário de forma LIMPA
+   - Remova prefixos como "em", "no", "na", "para", "de"
+   - Exemplos:
+     * "Compra aprovada em LA BRASILERIE" → "LA BRASILERIE"
+     * "Compra no cartao PADARIA SAO JOSE" → "PADARIA SAO JOSE"
+     * "PIX para MARIA SILVA" → "MARIA SILVA"
+
+2. VALOR:
+   - Converta para número decimal (sem R$, sem formatação)
+   - Exemplos: "R$ 1.234,56" → 1234.56 | "450,00" → 450.00
+
+3. DATA:
+   - Formato: YYYY-MM-DD
+   - Se apenas DD/MM, use o ano atual (${currentYear})
+   - IMPORTANTE: DD/MM = dia/mês (ex: 09/10 = 9 de outubro, NÃO 10 de setembro)
+   - Exemplos:
+     * "06/10" → "${currentYear}-10-06"
+     * "15/12/2024" → "2024-12-15"
+
+4. TIPO DE TRANSAÇÃO:
+   - "expense" = Compras, pagamentos, PIX enviado, saques
+   - "income" = Salário, PIX recebido, depósitos, transferências recebidas
+   - "investment" = Aplicações, investimentos
+
+5. CATEGORIA:
+   - Escolha APENAS entre as categorias registradas pelo usuário
+   - Use o contexto histórico para categorias similares
+   - Se nenhuma categoria se encaixar perfeitamente, escolha a mais próxima
+   - Se não houver categorias ou nenhuma se encaixar, use "outros"
+   - NUNCA invente categorias que não estão na lista
+
+6. CARTÃO:
+   - Extraia os últimos 4 dígitos do cartão se mencionado
+   - Se os dígitos corresponderem a um cartão cadastrado, retorne o match
+   - Padrões comuns: "final 1234", "cartão 1234", "****1234"
+
+7. PARCELAS:
+   - Extraia número de parcelas se mencionado
+   - Padrões: "em 3 vezes", "3x", "parcelado em 12x"
+   - Se não houver menção, use 1
+
+8. BANCO REMETENTE:
+   - Identifique o banco: CAIXA, Nubank, Santander, Itaú, Bradesco, Inter, etc.
+
+RETORNE APENAS UM OBJETO JSON VÁLIDO (sem texto adicional, sem markdown):
+
+{
+  "description": "Nome do estabelecimento/beneficiário (limpo, sem prefixos)",
+  "amount": 0.00,
+  "date": "YYYY-MM-DD",
+  "type": "expense|income|investment",
+  "category": "categoria da lista do usuário ou 'outros'",
+  "card_last_digits": "1234 ou null",
+  "installments": 1,
+  "confidence": 95,
+  "bank_name": "Nome do banco ou null"
+}
+
+EXEMPLOS DE EXTRAÇÃO:
+
+Entrada: "CAIXA: Compra aprovada em RAFAEL FERNANDES SALE R$ 457,00 em 2 vezes, 06/10 as 19:55, ELO final 1527"
+Saída:
+{
+  "description": "RAFAEL FERNANDES SALE",
+  "amount": 457.00,
+  "date": "${currentYear}-10-06",
+  "type": "expense",
+  "category": "compras",
+  "card_last_digits": "1527",
+  "installments": 2,
+  "confidence": 98,
+  "bank_name": "CAIXA"
+}
+
+Entrada: "Santander: Compra no cartao final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada."
+Saída:
+{
+  "description": "COMERCIAL CASA",
+  "amount": 66.00,
+  "date": "2025-10-17",
+  "type": "expense",
+  "category": "compras",
+  "card_last_digits": "0405",
+  "installments": 1,
+  "confidence": 98,
+  "bank_name": "Santander"
+}
+
+Entrada: "Você recebeu um Pix de R$ 250,00 de João Silva em 15/10"
+Saída:
+{
+  "description": "João Silva",
+  "amount": 250.00,
+  "date": "${currentYear}-10-15",
+  "type": "income",
+  "category": "outros",
+  "card_last_digits": null,
+  "installments": 1,
+  "confidence": 95,
+  "bank_name": null
+}
+
+AGORA ANALISE O SMS E RETORNE APENAS O JSON:`;
+};
+
+/**
+ * Extract transaction data from SMS using AI with historical context
  * @param {string} smsText - SMS text
  * @param {Object} aiConfig - AI configuration with provider and apiKey
  * @param {Array} cards - User's credit cards for matching
  * @param {Array} availableCategories - List of user's registered categories
+ * @param {string} userId - User ID for historical pattern learning
  * @returns {Promise<Object>} Extracted transaction data
  */
-export const extractFromSMSWithAI = async (smsText, aiConfig, cards = [], availableCategories = []) => {
+export const extractFromSMSWithAI = async (smsText, aiConfig, cards = [], availableCategories = [], userId = null) => {
   if (!aiConfig || !aiConfig.apiKey) {
     throw new Error('Configuração de IA não fornecida');
   }
@@ -101,46 +246,37 @@ export const extractFromSMSWithAI = async (smsText, aiConfig, cards = [], availa
 
   // Build category list
   const categoryNames = availableCategories.map(c => c.name).join(', ');
-  const categoryInstruction = categoryNames 
-    ? `categoria sugerida (escolha APENAS entre as categorias cadastradas: ${categoryNames})`
-    : `categoria sugerida (use "outros" se não houver categorias cadastradas)`;
+  
+  // Fetch historical context for better categorization
+  let historicalContext = {};
+  if (userId) {
+    try {
+      const { supabase } = await import('../../supabaseClient');
+      const { data: recentTransactions } = await supabase
+        .from('transactions')
+        .select('description, category, type')
+        .eq('user_id', userId)
+        .not('category', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (recentTransactions && recentTransactions.length > 0) {
+        // Map category IDs to names
+        const transactionsWithNames = recentTransactions.map(t => {
+          const cat = availableCategories.find(c => c.id === t.category);
+          return {
+            ...t,
+            category: cat ? cat.name : 'outros'
+          };
+        });
+        historicalContext.recentTransactions = transactionsWithNames;
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar contexto histórico:', error);
+    }
+  }
 
-  const prompt = `Você é um assistente especializado em extrair dados de transações financeiras de mensagens SMS bancárias brasileiras.
-
-Analise o seguinte SMS e extraia as informações da transação:
-
-"""
-${smsText}
-"""
-
-Cartões cadastrados (últimos 4 dígitos): ${cardDigitsList.length > 0 ? cardDigitsList.join(', ') : 'Nenhum'}
-
-Retorne APENAS um objeto JSON válido com os seguintes campos:
-{
-  "description": "descrição do estabelecimento ou beneficiário (extraia o nome do estabelecimento sem prefixos ou sufixos como 'em', 'no', etc.)",
-  "amount": valor numérico da transação,
-  "date": "data no formato YYYY-MM-DD",
-  "type": "expense" ou "income" ou "investment",
-  "category": "${categoryInstruction}",
-  "card_last_digits": "últimos 4 dígitos do cartão se mencionado, ou null",
-  "card_id": "ID do cartão se os dígitos corresponderem a um cartão cadastrado, ou null",
-  "installments": número de parcelas se mencionado ou 1,
-  "confidence": score de confiança de 0 a 100,
-  "bank_name": "nome do banco remetente do SMS (CAIXA, Nubank, etc.) ou null"
-}
-
-IMPORTANTE:
-- Extraia o nome do estabelecimento de forma limpa (ex: "LA BRASILERIE" em vez de "em LA BRASILERIE")
-- A categoria DEVE ser escolhida SOMENTE entre as categorias cadastradas pelo usuário: ${categoryNames || 'outros'}
-- Se nenhuma categoria registrada se encaixar perfeitamente, escolha a mais próxima ou use "outros" se disponível
-- Se os últimos 4 dígitos do cartão corresponderem a algum dos cartões cadastrados, use o card_id correspondente
-- Para PIX recebido, type deve ser "income"
-- Para PIX enviado ou compras, type deve ser "expense"
-- Valores devem ser numéricos (sem R$ ou formatação)
-- Datas devem estar no formato YYYY-MM-DD
-- Se a data tiver apenas DD/MM, use o ano atual (${new Date().getFullYear()})
-- Datas no formato DD/MM significam dia/mês (ex: 09/10 = 9 de outubro, não 10 de setembro)
-- Retorne APENAS o JSON, sem texto adicional`;
+  const prompt = buildEnhancedPrompt(smsText, cardDigitsList, categoryNames, historicalContext);
 
   try {
     let response;
@@ -163,6 +299,32 @@ IMPORTANTE:
     
     const extracted = JSON.parse(jsonText);
     
+    // Match category name to ID (strict matching with user's categories only)
+    let categoryId = null;
+    if (extracted.category) {
+      const matchedCategory = availableCategories.find(c => 
+        c.name.toLowerCase() === extracted.category.toLowerCase() ||
+        c.name.toLowerCase().includes(extracted.category.toLowerCase()) ||
+        extracted.category.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (matchedCategory) {
+        categoryId = matchedCategory.id;
+      }
+    }
+    
+    // If no category matched and we have historical context, try pattern learning
+    if (!categoryId && userId && extracted.description) {
+      const historyMatch = await suggestCategoryFromHistory(userId, extracted.description);
+      if (historyMatch && historyMatch.confidence > 0.5) {
+        const matchedCategory = availableCategories.find(c => c.id === historyMatch.categoryId);
+        if (matchedCategory) {
+          categoryId = matchedCategory.id;
+          extracted.category = matchedCategory.name;
+          extracted.confidence = Math.min(extracted.confidence || 85, historyMatch.confidence * 100);
+        }
+      }
+    }
+    
     // Match card_id based on last_digits
     if (extracted.card_last_digits && !extracted.card_id) {
       const matchedCard = cards.find(card => {
@@ -178,6 +340,7 @@ IMPORTANTE:
     
     return {
       ...extracted,
+      categoryId: categoryId,
       date: extracted.date || parseDate(null),
       amount: typeof extracted.amount === 'number' ? extracted.amount : parseAmount(String(extracted.amount)),
       confidence: extracted.confidence || 85,
@@ -279,6 +442,7 @@ const extractFromSMSBasic = (smsText, cards = []) => {
     date,
     type,
     category,
+    categoryId: null,
     card_last_digits: cardDigits,
     card_id: cardId,
     installments,
@@ -302,11 +466,11 @@ const callOpenAI = async (prompt, apiKey, model) => {
     body: JSON.stringify({
       model: model,
       messages: [
-        { role: 'system', content: 'Você é um assistente especializado em extrair dados estruturados de mensagens SMS bancárias.' },
+        { role: 'system', content: 'Você é um assistente especializado em extrair dados estruturados de mensagens SMS bancárias. Retorne APENAS JSON válido, sem texto adicional.' },
         { role: 'user', content: prompt }
       ],
       temperature: 0.1,
-      max_tokens: 500
+      max_tokens: 800
     })
   });
   
@@ -333,7 +497,7 @@ const callGemini = async (prompt, apiKey, model) => {
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 500
+        maxOutputTokens: 800
       }
     })
   });
@@ -359,7 +523,7 @@ const callClaude = async (prompt, apiKey, model) => {
     },
     body: JSON.stringify({
       model: model,
-      max_tokens: 500,
+      max_tokens: 800,
       temperature: 0.1,
       messages: [
         { role: 'user', content: prompt }
@@ -381,9 +545,10 @@ const callClaude = async (prompt, apiKey, model) => {
  * @param {Object} aiConfig - AI configuration
  * @param {Array} cards - User's credit cards
  * @param {Array} availableCategories - List of user's registered categories
+ * @param {string} userId - User ID for historical context
  * @returns {Promise<Array>} Array of extracted transactions
  */
-export const extractMultipleFromText = async (text, aiConfig, cards = [], availableCategories = []) => {
+export const extractMultipleFromText = async (text, aiConfig, cards = [], availableCategories = [], userId = null) => {
   // Split by common SMS separators
   const messages = text.split(/\n\n+|\r\n\r\n+/).filter(msg => msg.trim().length > 10);
   
@@ -391,7 +556,7 @@ export const extractMultipleFromText = async (text, aiConfig, cards = [], availa
   
   for (const message of messages) {
     try {
-      const extracted = await extractFromSMSWithAI(message, aiConfig, cards, availableCategories);
+      const extracted = await extractFromSMSWithAI(message, aiConfig, cards, availableCategories, userId);
       if (extracted && extracted.amount > 0) {
         transactions.push(extracted);
       }
