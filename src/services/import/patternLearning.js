@@ -82,10 +82,11 @@ export const suggestCategoryFromHistory = async (userId, description, limit = 10
     let bestScore = 0;
 
     for (const [categoryId, scores] of Object.entries(categoryScores)) {
-      // Score ponderado: média de similaridade + bônus por frequência
+      // Score ponderado: média de similaridade + bônus por frequência + bônus por recência
       const avgScore = scores.totalScore / scores.count;
-      const frequencyBonus = Math.min(scores.count / 10, 0.2); // Máximo 0.2 de bônus
-      const finalScore = avgScore + frequencyBonus;
+      const frequencyBonus = Math.min(scores.count / 10, 0.15); // Máximo 0.15 de bônus
+      const recencyBonus = Math.min(scores.recentCount / 5, 0.1); // Máximo 0.1 de bônus
+      const finalScore = avgScore + frequencyBonus + recencyBonus;
 
       if (finalScore > bestScore) {
         bestScore = finalScore;
@@ -93,6 +94,7 @@ export const suggestCategoryFromHistory = async (userId, description, limit = 10
           categoryId,
           confidence: Math.min(finalScore, 1),
           matchCount: scores.count,
+          recentMatchCount: scores.recentCount,
           maxSimilarity: scores.maxSimilarity
         };
       }
