@@ -19,9 +19,10 @@ export const suggestCategoryFromHistory = async (userId, description, limit = 10
 
   try {
     // Buscar transações anteriores do usuário com categoria definida
+    // Priorizar transações mais recentes e mais frequentes
     const { data: transactions, error } = await supabase
       .from('transactions')
-      .select('description, category')
+      .select('description, category, type, created_at')
       .eq('user_id', userId)
       .not('category', 'is', null)
       .order('created_at', { ascending: false })
