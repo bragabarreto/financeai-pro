@@ -19,57 +19,55 @@ const fileToBase64 = (file) => {
 };
 
 /**
- * Categoriza transação baseada em palavras-chave
+ * Categoriza transação baseada em palavras-chave e histórico
  */
-const suggestCategory = (description, type, availableCategories) => {
+const suggestCategory = async (description, type, availableCategories, userId = null) => {
   const desc = description.toLowerCase();
   
-  // Mapeamento de palavras-chave para categorias
-  const keywordMap = {
-    income: {
-      'salario': ['subsídio', 'salário', 'vencimento', 'remuneração', 'substituição', 'gecj', 'gratificação'],
-      'beneficios': ['auxílio', 'benefício', 'vale', 'ajuda', 'assistência'],
-      'bonus': ['bônus', 'prêmio', 'gratificação', 'adicional'],
-      'horas_extras': ['hora extra', 'horas extras', 'adicional noturno'],
-      'ferias': ['férias', 'terço', '1/3'],
-      'decimo': ['13º', 'décimo terceiro', 'gratificação natalina'],
-      'outros': ['indenização', 'compensação', 'ressarcimento']
-    },
-    expense: {
-      'saude': ['saúde', 'plano', 'médico', 'unimed', 'amil', 'bradesco saúde', 'odonto'],
-      'previdencia': ['previdência', 'rpps', 'inss', 'funpresp', 'contribuição previdenciária'],
-      'seguros': ['seguro', 'invalidez', 'morte', 'vida'],
-      'impostos': ['imposto', 'ir', 'renda', 'irrf', 'tributo'],
-      'emprestimos': ['empréstimo', 'financiamento', 'consignado', 'cef', 'banco'],
-      'pensao_alimenticia': ['pensão', 'alimentícia', 'alimentos'],
-      'sindicato': ['sindicato', 'associação', 'contribuição sindical', 'amatra', 'ajufe'],
-      'outros': ['devolução', 'desconto', 'ajuste']
-    }
-  };
-  
-  const keywords = keywordMap[type] || {};
-  
-  // Procurar categoria correspondente
-  for (const [categoryKey, terms] of Object.entries(keywords)) {
-    if (terms.some(term => desc.includes(term))) {
-      // Encontrar categoria correspondente nas categorias disponíveis
-      const category = availableCategories.find(c => 
-        c.name.toLowerCase().includes(categoryKey) ||
-        categoryKey.includes(c.name.toLowerCase())
-      );
+  // 1. Tentar buscar no histórico primeiro (prioridade máxima)
+  if (userId) {
+    try {
+      const { suggestCategoryFromHistory } = await import('./patternLearning');
+      const historyMatch = await suggestCategoryFromHistory(userId, description);
       
-      if (category) {
-        return {
-          categoryId: category.id,
-          categoryName: category.name,
-          confidence: 85
-        };
+      if (historyMatch && historyMatch.confidence > 0.6) {
+        const category = availableCategories.find(c => c.id === historyMatch.categoryId);
+        if (category) {
+          return {
+            categoryId: category.id,
+            categoryName: category.name,
+            confidence: historyMatch.confidence * 100,
+            source: 'history'
+          };
+        }
       }
+    } catch (error) {
+      console.warn('Erro ao buscar histórico:', error);
     }
   }
   
-  return null;
-};
+  // 2. Mapeamento de palavras-chave para categorias (fallback)
+  const keywordMap = {
+    income: {
+      'salario': ['subsídio', 'salário', 'vencimento', 'remuneração', 'substituição', 'gecj', 'gratificação', 'ordenado'],
+      'beneficios': ['auxílio', 'benefício', 'vale', 'ajuda', 'assistência'],
+      'bonus': ['bônus', 'prêmio', 'gratificação', 'adicional'],
+      'horas_extras': ['hora extra', 'horas extras', 'adicional noturno', 'sobreaviso'],
+      'ferias': ['férias', 'terço', '1/3', 'abono'],
+      'decimo': ['13º', 'décimo terceiro', 'gratificação natalina'],
+      'outros': ['indenização', 'compensação', 'ressarcimento', 'reembolso']
+    },
+    expense: {
+      'saude': ['saúde', 'plano', 'médico', 'unimed', 'amil', 'bradesco saúde', 'odonto', 'dental'],
+      'previdencia': ['previdência', 'rpps', 'inss', 'funpresp', 'contribuição previdenciária', 'previdenciaria'],
+      'seguros': ['seguro', 'invalidez', 'morte', 'vida'],
+      'impostos': ['imposto', 'ir', 'renda', 'irrf', 'tributo', 'imposto de renda'],
+      'emprestimos': ['empréstimo', 'financiamento', 'consignado', 'cef', 'banco', 'emprestimo'],
+      'pensao_alimenticia': ['pensão', 'alimentícia', 'alimentos', 'pensao', 'alimenticia'],
+      'sindicato': ['sindicato', 'associação', 'contribuição sindical', 'amatra', 'ajufe', 'associacao'],
+      'outros': ['devolução', 'desconto', 'ajuste', 'devolucao']
+    }
+  };\n  \n  const keywords = keywordMap[type] || {};\n  \n  // Procurar categoria correspondente nas palavras-chave\n  let bestMatch = null;\n  let bestScore = 0;\n  \n  for (const [categoryKey, terms] of Object.entries(keywords)) {\n    // Calcular score de match\n    const matchingTerms = terms.filter(term => desc.includes(term));\n    if (matchingTerms.length > 0) {\n      const score = matchingTerms.length / terms.length;\n      \n      if (score > bestScore) {\n        // Encontrar categoria correspondente nas categorias disponíveis\n        const category = availableCategories.find(c => \n          c.name.toLowerCase().includes(categoryKey) ||\n          categoryKey.includes(c.name.toLowerCase()) ||\n          matchingTerms.some(term => c.name.toLowerCase().includes(term))\n        );\n        \n        if (category) {\n          bestScore = score;\n          bestMatch = {\n            categoryId: category.id,\n            categoryName: category.name,\n            confidence: Math.min(85, 60 + (score * 25)), // 60-85 based on match quality\n            source: 'keywords'\n          };\n        }\n      }\n    }\n  }\n  \n  return bestMatch;\n};
 
 /**
  * Detecta se é pensão alimentícia
