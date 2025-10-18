@@ -36,14 +36,22 @@ describe('Photo Extractor AI', () => {
       { id: 'card2', last_digits: '5678', name: 'Cartão Teste 2' }
     ];
 
+    const mockCategories = [
+      { id: 'cat1', name: 'alimentacao', type: 'expense' },
+      { id: 'cat2', name: 'transporte', type: 'expense' },
+      { id: 'cat3', name: 'saude', type: 'expense' },
+      { id: 'cat4', name: 'compras', type: 'expense' },
+      { id: 'cat5', name: 'outros', type: 'expense' }
+    ];
+
     it('deve lançar erro quando aiConfig não é fornecida', async () => {
-      await expect(extractFromPhotoWithAI(mockFile, null, mockCards))
+      await expect(extractFromPhotoWithAI(mockFile, null, mockCards, mockCategories))
         .rejects.toThrow('Configuração de IA não fornecida');
     });
 
     it('deve lançar erro quando apiKey está faltando', async () => {
       const invalidConfig = { ...mockAIConfig, apiKey: null };
-      await expect(extractFromPhotoWithAI(mockFile, invalidConfig, mockCards))
+      await expect(extractFromPhotoWithAI(mockFile, invalidConfig, mockCards, mockCategories))
         .rejects.toThrow('Configuração de IA não fornecida');
     });
 
@@ -73,7 +81,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards);
+      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards, mockCategories);
 
       expect(result).toBeDefined();
       expect(result.description).toBe('SUPERMERCADO XYZ');
@@ -107,7 +115,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      const result = await extractFromPhotoWithAI(mockFile, openAIConfig, mockCards);
+      const result = await extractFromPhotoWithAI(mockFile, openAIConfig, mockCards, mockCategories);
 
       expect(result).toBeDefined();
       expect(result.description).toBe('LOJA ABC');
@@ -135,7 +143,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      const result = await extractFromPhotoWithAI(mockFile, claudeConfig, mockCards);
+      const result = await extractFromPhotoWithAI(mockFile, claudeConfig, mockCards, mockCategories);
 
       expect(result).toBeDefined();
       expect(result.description).toBe('RESTAURANTE DEF');
@@ -145,7 +153,7 @@ describe('Photo Extractor AI', () => {
     it('deve lançar erro quando provedor é inválido', async () => {
       const invalidConfig = { ...mockAIConfig, provider: 'invalid-provider' };
       
-      await expect(extractFromPhotoWithAI(mockFile, invalidConfig, mockCards))
+      await expect(extractFromPhotoWithAI(mockFile, invalidConfig, mockCards, mockCategories))
         .rejects.toThrow('Provedor de IA não suportado');
     });
 
@@ -158,7 +166,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      await expect(extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards))
+      await expect(extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards, mockCategories))
         .rejects.toThrow();
     });
 
@@ -184,7 +192,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      await expect(extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards))
+      await expect(extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards, mockCategories))
         .rejects.toThrow('não conseguiu extrair todas as informações necessárias');
     });
 
@@ -212,7 +220,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards);
+      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards, mockCategories);
 
       expect(result).toBeDefined();
       expect(result.description).toBe('FARMACIA XYZ');
@@ -242,7 +250,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards);
+      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards, mockCategories);
 
       expect(result).toBeDefined();
       expect(result.amount).toBe(180.50);
@@ -273,7 +281,7 @@ describe('Photo Extractor AI', () => {
         })
       });
 
-      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards);
+      const result = await extractFromPhotoWithAI(mockFile, mockAIConfig, mockCards, mockCategories);
 
       expect(result).toBeDefined();
       expect(result.date).toBeDefined();
