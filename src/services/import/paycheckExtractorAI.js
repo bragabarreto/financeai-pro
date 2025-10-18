@@ -80,7 +80,7 @@ const isAlimony = (description) => {
 /**
  * Extrai dados de contracheque usando IA
  */
-export const extractFromPaycheck = async (file, aiConfig, availableCategories = []) => {
+export const extractFromPaycheck = async (file, aiConfig, availableCategories = [], userId = null) => {
   try {
     console.log('🔄 Iniciando extração de contracheque com IA...');
     
