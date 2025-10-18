@@ -1,9 +1,11 @@
 /**
  * Photo Transaction Extractor with AI
  * Extracts transaction data from photos/images using Vision AI
+ * Enhanced with historical pattern learning and better OCR instructions
  */
 
 import { getTodayLocalDate } from '../../utils/dateUtils';
+import { suggestCategoryFromHistory } from './patternLearning';
 
 /**
  * Parse Brazilian currency format
@@ -76,14 +78,183 @@ const fileToBase64 = (file) => {
 };
 
 /**
- * Extract transaction data from photo using AI Vision
+ * Build enhanced AI prompt with user context for vision
+ * @param {Array} cardDigitsList - List of registered card digits
+ * @param {string} categoryNames - Comma-separated category names
+ * @param {Object} historicalContext - Historical transaction patterns
+ * @returns {string} Enhanced prompt
+ */
+const buildEnhancedVisionPrompt = (cardDigitsList, categoryNames, historicalContext = {}) => {
+  const currentYear = new Date().getFullYear();
+  
+  let contextSection = '';
+  if (historicalContext.recentTransactions && historicalContext.recentTransactions.length > 0) {
+    contextSection = `\n\nCONTEXTO HISTÓRICO DO USUÁRIO (use para melhorar precisão de categorização):
+${historicalContext.recentTransactions.slice(0, 10).map(t => 
+  `- "${t.description}" → ${t.category} (${t.type})`
+).join('\n')}`;
+  }
+  
+  return `Você é um assistente especializado em OCR e extração de dados de comprovantes, recibos e notificações bancárias brasileiras.
+
+Sua tarefa é analisar a imagem fornecida e extrair TODAS as informações financeiras com MÁXIMA PRECISÃO.
+
+TIPOS DE IMAGEM QUE VOCÊ PODE RECEBER:
+1. Comprovante de PIX (enviado ou recebido)
+2. Notificação de cartão de crédito (screenshot de celular)
+3. Notificação de cartão de débito
+4. Recibo de transferência
+5. Comprovante de pagamento
+6. Nota fiscal ou cupom fiscal
+7. Boleto bancário
+
+CARTÕES CADASTRADOS PELO USUÁRIO (últimos 4 dígitos):
+${cardDigitsList.length > 0 ? cardDigitsList.join(', ') : 'Nenhum cartão cadastrado'}
+
+CATEGORIAS REGISTRADAS PELO USUÁRIO:
+${categoryNames || 'Nenhuma categoria registrada - use "outros"'}${contextSection}
+
+INSTRUÇÕES DETALHADAS DE EXTRAÇÃO:
+
+1. IDENTIFICAÇÃO DO TIPO:
+   - Analise a imagem e identifique o tipo de comprovante
+   - PIX: procure por "Comprovante PIX", chave PIX, ID da transação E2E
+   - Cartão: procure por "aprovada", "últimos dígitos", "final 1234"
+   - Transferência: procure por TED, DOC, transferência
+
+2. DESCRIÇÃO/ESTABELECIMENTO:
+   - Para PIX: extraia o nome do PAGADOR (se recebeu) ou BENEFICIÁRIO (se enviou)
+   - Para compra: extraia o nome do ESTABELECIMENTO de forma limpa
+   - Remova prefixos como "para", "de", "em"
+   - Se houver razão social e nome fantasia, prefira o nome fantasia
+
+3. VALOR:
+   - Procure por "R$" seguido de números
+   - Pode estar em diferentes formatos: R$ 1.234,56 ou 1234,56 ou 1.234,56
+   - Converta para número decimal (ex: 1234.56)
+   - ATENÇÃO: Não confunda data com valor!
+
+4. DATA E HORA:
+   - Procure pela data da transação (não a data de impressão do comprovante)
+   - Formatos comuns: DD/MM/YYYY, DD/MM/AA, DD-MM-YYYY
+   - Se aparecer apenas DD/MM, use o ano atual (${currentYear})
+   - Extraia hora se disponível (HH:MM ou HH:MM:SS)
+   - Formato de saída: data "YYYY-MM-DD", hora "HH:MM"
+
+5. TIPO DE TRANSAÇÃO:
+   - PIX RECEBIDO: type="income", preencha "payer" (quem pagou)
+   - PIX ENVIADO: type="expense", preencha "beneficiary" (quem recebeu)
+   - COMPRA/DÉBITO: type="expense"
+   - DEPÓSITO/CRÉDITO: type="income"
+   - INVESTIMENTO/APLICAÇÃO: type="investment"
+
+6. MEIO DE PAGAMENTO (transaction_type):
+   - "pix" = PIX
+   - "credit_card" = Cartão de Crédito
+   - "debit_card" = Cartão de Débito
+   - "transfer" = Transferência (TED/DOC)
+   - "boleto" = Boleto Bancário
+
+7. CATEGORIA:
+   - Escolha ESTRITAMENTE entre as categorias registradas pelo usuário
+   - Use o contexto histórico se a descrição for similar
+   - Se for compra em mercado/supermercado → "alimentacao" (se disponível)
+   - Se for restaurante/lanchonete → "alimentacao" (se disponível)
+   - Se for posto/combustivel → "transporte" (se disponível)
+   - Se for farmácia/hospital → "saude" (se disponível)
+   - Se NENHUMA categoria se encaixar, use "outros"
+   - NUNCA invente categorias
+
+8. CARTÃO (se aplicável):
+   - Procure por: "final 1234", "últimos 4 dígitos", "****1234", "cartão 1234"
+   - Extraia APENAS os 4 dígitos numéricos
+   - Se os dígitos coincidirem com um cartão cadastrado, marque como identificado
+
+9. INFORMAÇÕES PIX (se aplicável):
+   - "beneficiary": Nome de quem recebeu (se você enviou)
+   - "payer": Nome de quem enviou (se você recebeu)
+   - "pix_key": Chave PIX usada (CPF, telefone, e-mail, chave aleatória)
+   - "transaction_id": ID E2E da transação (começa com E)
+
+10. PARCELAS:
+   - Procure por: "em 3x", "parcelado", "3 vezes"
+   - Se não houver menção, use 1
+
+11. CONFIANÇA:
+   - Alta (95-100): Imagem nítida, todos os campos claramente visíveis
+   - Média (80-94): Imagem boa, alguns campos podem ter pequena incerteza
+   - Baixa (60-79): Imagem com qualidade ruim, campos difíceis de ler
+
+RETORNE APENAS UM OBJETO JSON VÁLIDO (sem texto adicional, sem markdown, sem explicações):
+
+{
+  "description": "Nome estabelecimento/beneficiário/pagador",
+  "amount": 0.00,
+  "date": "YYYY-MM-DD",
+  "time": "HH:MM ou null",
+  "type": "expense|income|investment",
+  "transaction_type": "pix|credit_card|debit_card|transfer|boleto",
+  "category": "categoria da lista do usuário ou 'outros'",
+  "card_last_digits": "1234 ou null",
+  "beneficiary": "nome ou null",
+  "payer": "nome ou null",
+  "pix_key": "chave ou null",
+  "transaction_id": "ID ou null",
+  "installments": 1,
+  "confidence": 95
+}
+
+EXEMPLOS:
+
+[Imagem: Comprovante PIX enviado]
+{
+  "description": "Maria Silva",
+  "amount": 150.00,
+  "date": "${currentYear}-10-15",
+  "time": "14:30",
+  "type": "expense",
+  "transaction_type": "pix",
+  "category": "outros",
+  "card_last_digits": null,
+  "beneficiary": "Maria Silva",
+  "payer": null,
+  "pix_key": "maria@email.com",
+  "transaction_id": "E12345678901234567890123456789012345",
+  "installments": 1,
+  "confidence": 98
+}
+
+[Imagem: Notificação cartão]
+{
+  "description": "SUPERMERCADO BOM PRECO",
+  "amount": 287.50,
+  "date": "${currentYear}-10-20",
+  "time": "18:45",
+  "type": "expense",
+  "transaction_type": "credit_card",
+  "category": "alimentacao",
+  "card_last_digits": "4521",
+  "beneficiary": null,
+  "payer": null,
+  "pix_key": null,
+  "transaction_id": null,
+  "installments": 1,
+  "confidence": 95
+}
+
+AGORA ANALISE A IMAGEM E RETORNE APENAS O JSON:`;
+};
+
+/**
+ * Extract transaction data from photo using AI Vision with historical context
  * @param {File} imageFile - Image file containing transaction receipt/notification
  * @param {Object} aiConfig - AI configuration with provider and apiKey
  * @param {Array} cards - User's credit cards for matching
  * @param {Array} availableCategories - List of user's registered categories
+ * @param {string} userId - User ID for historical pattern learning
  * @returns {Promise<Object>} Extracted transaction data
  */
-export const extractFromPhotoWithAI = async (imageFile, aiConfig, cards = [], availableCategories = []) => {
+export const extractFromPhotoWithAI = async (imageFile, aiConfig, cards = [], availableCategories = [], userId = null) => {
   if (!aiConfig || !aiConfig.apiKey) {
     throw new Error('Configuração de IA não fornecida');
   }
@@ -98,53 +269,44 @@ export const extractFromPhotoWithAI = async (imageFile, aiConfig, cards = [], av
 
   // Build category list by type
   const categoryNames = availableCategories.map(c => c.name).join(', ');
-  const categoryInstruction = categoryNames 
-    ? `categoria sugerida (escolha APENAS entre as categorias cadastradas: ${categoryNames})`
-    : `categoria sugerida (use "outros" se não houver categorias cadastradas)`;
+  
+  // Fetch historical context for better categorization
+  let historicalContext = {};
+  if (userId) {
+    try {
+      const { supabase } = await import('../../supabaseClient');
+      const { data: recentTransactions } = await supabase
+        .from('transactions')
+        .select('description, category, type')
+        .eq('user_id', userId)
+        .not('category', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (recentTransactions && recentTransactions.length > 0) {
+        // Map category IDs to names
+        const transactionsWithNames = recentTransactions.map(t => {
+          const cat = availableCategories.find(c => c.id === t.category);
+          return {
+            ...t,
+            category: cat ? cat.name : 'outros'
+          };
+        });
+        historicalContext.recentTransactions = transactionsWithNames;
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar contexto histórico:', error);
+    }
+  }
 
-  const prompt = `Você é um assistente especializado em extrair dados de transações financeiras de imagens de comprovantes, notificações e recibos bancários brasileiros.
-
-Analise a imagem e extraia as informações da transação financeira.
-
-Cartões cadastrados (últimos 4 dígitos): ${cardDigitsList.length > 0 ? cardDigitsList.join(', ') : 'Nenhum'}
-
-Retorne APENAS um objeto JSON válido com os seguintes campos:
-{
-  "description": "descrição do estabelecimento, beneficiário ou pagador",
-  "amount": valor numérico da transação,
-  "date": "data no formato YYYY-MM-DD",
-  "time": "hora no formato HH:MM se disponível, ou null",
-  "type": "expense" ou "income" ou "investment",
-  "transaction_type": "tipo específico: pix, credit_card, debit_card, transfer, boleto",
-  "category": "${categoryInstruction}",
-  "card_last_digits": "últimos 4 dígitos do cartão se visível, ou null",
-  "card_id": "ID do cartão se os dígitos corresponderem a um cartão cadastrado, ou null",
-  "beneficiary": "nome do beneficiário/recebedor se for PIX ou transferência, ou null",
-  "payer": "nome do pagador se for PIX recebido, ou null",
-  "pix_key": "chave PIX se visível, ou null",
-  "transaction_id": "ID da transação se visível, ou null",
-  "installments": número de parcelas se mencionado ou 1,
-  "confidence": score de confiança de 0 a 100
-}
-
-IMPORTANTE:
-- Para PIX recebido (você recebeu), type deve ser "income" e preencha "payer"
-- Para PIX enviado (você pagou), type deve ser "expense" e preencha "beneficiary"
-- Para compras com cartão, type deve ser "expense"
-- Se os últimos 4 dígitos do cartão corresponderem a algum dos cartões cadastrados, use o card_id correspondente
-- A categoria DEVE ser escolhida SOMENTE entre as categorias cadastradas pelo usuário: ${categoryNames || 'outros'}
-- Se nenhuma categoria registrada se encaixar perfeitamente, escolha a mais próxima ou use "outros" se disponível
-- Valores devem ser numéricos (sem R$ ou formatação)
-- Datas devem estar no formato YYYY-MM-DD
-- Se a data tiver apenas DD/MM, use o ano atual (2025)
-- Retorne APENAS o JSON, sem texto adicional`;
+  const prompt = buildEnhancedVisionPrompt(cardDigitsList, categoryNames, historicalContext);
 
   try {
     const base64Image = await fileToBase64(imageFile);
     let response;
     
     if (aiConfig.provider === 'openai' || aiConfig.provider === 'chatgpt') {
-      response = await callOpenAIVision(prompt, base64Image, aiConfig.apiKey, aiConfig.model || 'gpt-4.1-mini');
+      response = await callOpenAIVision(prompt, base64Image, aiConfig.apiKey, aiConfig.model || 'gpt-4o-mini');
     } else if (aiConfig.provider === 'gemini') {
       response = await callGeminiVision(prompt, base64Image, aiConfig.apiKey, aiConfig.model || 'gemini-2.5-flash');
     } else if (aiConfig.provider === 'claude') {
@@ -166,6 +328,32 @@ IMPORTANTE:
       throw new Error('A IA não conseguiu extrair todas as informações necessárias da foto. Tente uma imagem mais clara ou com melhor qualidade');
     }
     
+    // Match category name to ID (strict matching with user's categories only)
+    let categoryId = null;
+    if (extracted.category) {
+      const matchedCategory = availableCategories.find(c => 
+        c.name.toLowerCase() === extracted.category.toLowerCase() ||
+        c.name.toLowerCase().includes(extracted.category.toLowerCase()) ||
+        extracted.category.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (matchedCategory) {
+        categoryId = matchedCategory.id;
+      }
+    }
+    
+    // If no category matched and we have historical context, try pattern learning
+    if (!categoryId && userId && extracted.description) {
+      const historyMatch = await suggestCategoryFromHistory(userId, extracted.description);
+      if (historyMatch && historyMatch.confidence > 0.5) {
+        const matchedCategory = availableCategories.find(c => c.id === historyMatch.categoryId);
+        if (matchedCategory) {
+          categoryId = matchedCategory.id;
+          extracted.category = matchedCategory.name;
+          extracted.confidence = Math.min(extracted.confidence || 85, historyMatch.confidence * 100);
+        }
+      }
+    }
+    
     // Match card_id based on last_digits
     if (extracted.card_last_digits && !extracted.card_id) {
       const matchedCard = cards.find(card => {
@@ -179,8 +367,13 @@ IMPORTANTE:
       }
     }
     
+    // Map transaction_type to payment_method for consistency
+    const payment_method = extracted.transaction_type || null;
+    
     return {
       ...extracted,
+      categoryId: categoryId,
+      payment_method: payment_method,
       date: extracted.date || parseDate(null),
       amount: typeof extracted.amount === 'number' ? extracted.amount : parseAmount(String(extracted.amount)),
       confidence: extracted.confidence || 85,
@@ -193,7 +386,7 @@ IMPORTANTE:
     
     // Provide more specific error messages
     if (error.message.includes('JSON')) {
-      throw new Error('A IA não conseguiu extrair dados válidos da imagem. Certifique-se de que a foto contém um comprovante, recibo ou notificação de transação financeira');
+      throw new Error('A IA não conseguiu extrair dados válidos da imagem. Certifique-se de que a foto contém um comprovante, recibo ou notificação de transação financeira clara e legível');
     }
     
     throw error;
@@ -211,7 +404,7 @@ const callOpenAIVision = async (prompt, base64Image, apiKey, model) => {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: model.includes('vision') ? model : 'gpt-4o-mini',
+      model: model.includes('vision') || model.includes('4o') ? model : 'gpt-4o-mini',
       messages: [
         {
           role: 'user',
@@ -220,14 +413,15 @@ const callOpenAIVision = async (prompt, base64Image, apiKey, model) => {
             {
               type: 'image_url',
               image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`
+                url: `data:image/jpeg;base64,${base64Image}`,
+                detail: 'high'
               }
             }
           ]
         }
       ],
       temperature: 0.1,
-      max_tokens: 1000
+      max_tokens: 1500
     })
   });
   
@@ -263,7 +457,7 @@ const callGeminiVision = async (prompt, base64Image, apiKey, model) => {
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 1000
+        maxOutputTokens: 1500
       }
     })
   });
@@ -290,7 +484,7 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
     },
     body: JSON.stringify({
       model: model,
-      max_tokens: 1000,
+      max_tokens: 1500,
       temperature: 0.1,
       messages: [
         {
@@ -329,14 +523,15 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
  * @param {Object} aiConfig - AI configuration
  * @param {Array} cards - User's credit cards
  * @param {Array} availableCategories - List of user's registered categories
+ * @param {string} userId - User ID for historical context
  * @returns {Promise<Array>} Array of extracted transactions
  */
-export const extractMultipleFromPhotos = async (imageFiles, aiConfig, cards = [], availableCategories = []) => {
+export const extractMultipleFromPhotos = async (imageFiles, aiConfig, cards = [], availableCategories = [], userId = null) => {
   const transactions = [];
   
   for (const file of imageFiles) {
     try {
-      const extracted = await extractFromPhotoWithAI(file, aiConfig, cards, availableCategories);
+      const extracted = await extractFromPhotoWithAI(file, aiConfig, cards, availableCategories, userId);
       if (extracted && extracted.amount > 0) {
         transactions.push(extracted);
       }
