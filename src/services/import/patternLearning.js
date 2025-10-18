@@ -41,7 +41,7 @@ export const suggestCategoryFromHistory = async (userId, description, limit = 10
     // Mapear categorias encontradas com seus scores
     const categoryScores = {};
 
-    for (const transaction of transactions) {
+    for (const [index, transaction] of transactions.entries()) {
       const normalizedDesc = normalizeDescription(transaction.description);
       
       // Calcular similaridade
@@ -50,20 +50,30 @@ export const suggestCategoryFromHistory = async (userId, description, limit = 10
       if (similarity > 0.3) {
         const categoryId = transaction.category;
         
+        // Calcular peso baseado na recência (transações mais recentes têm maior peso)
+        const recencyWeight = 1 - (index / transactions.length) * 0.3; // 0.7 a 1.0
+        const weightedSimilarity = similarity * recencyWeight;
+        
         if (!categoryScores[categoryId]) {
           categoryScores[categoryId] = {
             totalScore: 0,
             count: 0,
-            maxSimilarity: 0
+            maxSimilarity: 0,
+            recentCount: 0 // Count of matches in last 10 transactions
           };
         }
         
-        categoryScores[categoryId].totalScore += similarity;
+        categoryScores[categoryId].totalScore += weightedSimilarity;
         categoryScores[categoryId].count += 1;
         categoryScores[categoryId].maxSimilarity = Math.max(
           categoryScores[categoryId].maxSimilarity,
           similarity
         );
+        
+        // Contar matches recentes (dão bonus)
+        if (index < 10) {
+          categoryScores[categoryId].recentCount += 1;
+        }
       }
     }
 
