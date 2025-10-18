@@ -368,8 +368,8 @@ AGORA ANALISE O CONTRACHEQUE E RETORNE APENAS O JSON:`;
     
     // Processar créditos (receitas)
     if (extractedData.credits && Array.isArray(extractedData.credits)) {
-      extractedData.credits.forEach((credit, index) => {
-        const suggestion = suggestCategory(credit.description, 'income', availableCategories);
+      for (const [index, credit] of extractedData.credits.entries()) {
+        const suggestion = await suggestCategory(credit.description, 'income', availableCategories, userId);
         
         transactions.push({
           id: `credit_${index}`,
@@ -386,19 +386,20 @@ AGORA ANALISE O CONTRACHEQUE E RETORNE APENAS O JSON:`;
           aiSuggestedCategory: suggestion?.categoryId || null,
           aiCategoryName: suggestion?.categoryName || null,
           aiConfidence: suggestion?.confidence || 0,
+          suggestionSource: suggestion?.source || null,
           account_id: null,
           card_id: null,
           selected: true,
           confidence: 90,
           editable: true
         });
-      });
+      }
     }
     
     // Processar débitos (despesas)
     if (extractedData.debits && Array.isArray(extractedData.debits)) {
-      extractedData.debits.forEach((debit, index) => {
-        const suggestion = suggestCategory(debit.description, 'expense', availableCategories);
+      for (const [index, debit] of extractedData.debits.entries()) {
+        const suggestion = await suggestCategory(debit.description, 'expense', availableCategories, userId);
         const isAlimonyFlag = debit.is_alimony || isAlimony(debit.description);
         
         transactions.push({
@@ -416,6 +417,7 @@ AGORA ANALISE O CONTRACHEQUE E RETORNE APENAS O JSON:`;
           aiSuggestedCategory: suggestion?.categoryId || null,
           aiCategoryName: suggestion?.categoryName || null,
           aiConfidence: suggestion?.confidence || 0,
+          suggestionSource: suggestion?.source || null,
           account_id: null,
           card_id: null,
           is_alimony: isAlimonyFlag,
@@ -423,7 +425,7 @@ AGORA ANALISE O CONTRACHEQUE E RETORNE APENAS O JSON:`;
           confidence: 90,
           editable: true
         });
-      });
+      }
     }
     
     console.log(`✅ ${transactions.length} transações processadas`);
