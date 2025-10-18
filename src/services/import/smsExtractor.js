@@ -226,6 +226,130 @@ const cleanDescription = (description) => {
 };
 
 /**
+ * Detect installments from SMS text
+ * @param {string} text - SMS text
+ * @returns {Object} Object with installments count and individual amount
+ */
+const detectInstallments = (text) => {
+  // Patterns for installment detection
+  const patterns = [
+    /em\s+(\d+)\s*[xX×]\s*de\s*R?\$?\s*([\d.,]+)/i,          // "em 3x de R$ 100,00"
+    /em\s+(\d+)\s+vezes?\s+de\s*R?\$?\s*([\d.,]+)/i,        // "em 3 vezes de R$ 100,00"
+    /(\d+)\s*[xX×]\s*de\s*R?\$?\s*([\d.,]+)/i,              // "3x de R$ 100,00"
+    /em\s+(\d+)\s+vezes?(?:\s*[,;.])?(?:\s|$)/i,            // "em 3 vezes," or "em 3 vezes" (without individual value)
+    /em\s+(\d+)\s*[xX×](?:\s*[,;.])?(?:\s|$)/i,             // "em 3x" (without individual value)
+    /(\d+)\s*[xX×](?!\d)(?:\s*[,;.])?(?:\s|$)/i             // "3x" (not followed by digits)
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const installmentCount = parseInt(match[1]);
+      const installmentValue = match[2] ? parseAmount(match[2]) : null;
+      
+      return {
+        count: installmentCount,
+        individualValue: installmentValue
+      };
+    }
+  }
+  
+  return { count: 1, individualValue: null };
+};
+
+/**
+ * Detect payment method from SMS text
+ * Defaults to 'credit_card' unless PIX or débito is mentioned
+ * @param {string} text - SMS text
+ * @param {string} defaultMethod - Default payment method from pattern
+ * @returns {string} Detected payment method
+ */
+const detectPaymentMethod = (text, defaultMethod) => {
+  const textLower = text.toLowerCase();
+  
+  // Check for PIX explicitly
+  if (/\bpix\b/i.test(text)) {
+    return 'pix';
+  }
+  
+  // Check for debit card (débito, debito, cartão débito)
+  if (/d[eé]bito|debit/i.test(text)) {
+    return 'debit_card';
+  }
+  
+  // Check for transfer keywords
+  if (/transfer[êe]ncia|ted|doc/i.test(text)) {
+    return 'transfer';
+  }
+  
+  // Check for boleto
+  if (/boleto/i.test(text)) {
+    return 'boleto_bancario';
+  }
+  
+  // If a default method was provided and it's not null, use it
+  if (defaultMethod && defaultMethod !== null) {
+    return defaultMethod;
+  }
+  
+  // Default to credit_card as per requirements
+  return 'credit_card';
+};
+
+/**
+ * Categorize establishment based on description
+ * @param {string} description - Establishment description
+ * @returns {string} Category
+ */
+const categorizeEstablishment = (description) => {
+  if (!description) return 'outros';
+  
+  const desc = description.toLowerCase();
+  
+  // Food & Dining - restaurants, bakeries, etc.
+  if (/(restaurante|lanchonete|padaria|mercado|supermercado|ifood|uber\s*eats|rappi|brasilerie|pizzaria|bar|cafe|cafeteria|lanches|hamburgueria|confeitaria|doceria|sorveteria|food|acai|açai|churrascaria|cantina|sushi)/i.test(desc)) {
+    return 'alimentacao';
+  }
+  
+  // Transportation
+  if (/(uber|99|taxi|combustivel|gasolina|posto|estacionamento|pedagio|pedágio|transporte|onibus|ônibus|metrô|metro)/i.test(desc)) {
+    return 'transporte';
+  }
+  
+  // Health
+  if (/(farmacia|farmácia|hospital|clinica|clínica|medico|médico|plano\s*de?\s*saude|plano\s*de?\s*saúde|drogaria|laboratorio|laboratório)/i.test(desc)) {
+    return 'saude';
+  }
+  
+  // Shopping
+  if (/(shopping|loja|magazine|mercado\s*livre|amazon|shopee|americanas|casas\s*bahia)/i.test(desc)) {
+    return 'compras';
+  }
+  
+  // Entertainment & Leisure
+  if (/(cinema|teatro|netflix|spotify|show|evento|ingresso|lazer|academia|gym)/i.test(desc)) {
+    return 'lazer';
+  }
+  
+  // Bills & Utilities
+  if (/(luz|energia|agua|água|internet|telefone|celular|conta|fatura|condominio|condomínio)/i.test(desc)) {
+    return 'contas';
+  }
+  
+  // Education
+  if (/(escola|faculdade|universidade|curso|livro|livraria)/i.test(desc)) {
+    return 'educacao';
+  }
+  
+  // Salary
+  if (/(salario|salário|pagamento|vencimento|folha)/i.test(desc)) {
+    return 'salario';
+  }
+  
+  return 'outros';
+};
+
+/**
  * Extract transaction from SMS text
  * @param {string} smsText - SMS message text
  * @returns {Object|null} Extracted transaction or null
@@ -241,6 +365,9 @@ export const extractFromSMS = (smsText) => {
   const bankName = extractBankName(text);
   const cardDigits = extractCardDigits(text);
   
+  // Detect installments in the SMS text
+  const installmentInfo = detectInstallments(text);
+  
   // Try each pattern
   for (const [patternName, config] of Object.entries(SMS_PATTERNS)) {
     const match = text.match(config.pattern);
@@ -248,11 +375,12 @@ export const extractFromSMS = (smsText) => {
     if (match) {
       let transaction = {
         type: config.type,
-        payment_method: config.paymentMethod,
+        payment_method: detectPaymentMethod(text, config.paymentMethod),
         origin: 'sms_import',
         raw_text: text.substring(0, 200), // Store original for reference
         bank_name: bankName, // Add bank metadata
-        card_last_digits: cardDigits // Add card metadata
+        card_last_digits: cardDigits, // Add card metadata
+        installments: installmentInfo.count
       };
       
       // Extract based on pattern type
@@ -305,6 +433,22 @@ export const extractFromSMS = (smsText) => {
         transaction.description = 'Transação importada de SMS';
         transaction.date = parseDate('');
       }
+      
+      // If we have installment info, divide total amount by installment count
+      // This follows the requirement: "dividir o valor total da compra"
+      if (installmentInfo.count > 1) {
+        transaction.installments = installmentInfo.count;
+        if (installmentInfo.individualValue && installmentInfo.individualValue > 0) {
+          // Use the individual installment value if explicitly provided in SMS
+          transaction.amount = installmentInfo.individualValue;
+        } else {
+          // Divide total amount by number of installments
+          transaction.amount = transaction.amount / installmentInfo.count;
+        }
+      }
+      
+      // Categorize establishment based on description
+      transaction.category = categorizeEstablishment(transaction.description);
       
       // Validate that we have at least amount
       if (transaction.amount > 0) {

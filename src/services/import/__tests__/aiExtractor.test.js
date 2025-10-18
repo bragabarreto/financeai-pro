@@ -185,8 +185,12 @@ describe('aiExtractor', () => {
       expect(detectPaymentMethod('', 'Aplicação CDB', 'investment')).toBe(null);
     });
 
-    test('should return null when unable to detect', () => {
-      expect(detectPaymentMethod('', '', 'expense')).toBe(null);
+    test('should default to credit_card for expenses when unable to detect', () => {
+      expect(detectPaymentMethod('', '', 'expense')).toBe('credit_card');
+    });
+
+    test('should return null for income when unable to detect', () => {
+      expect(detectPaymentMethod('', '', 'income')).toBe(null);
     });
   });
 

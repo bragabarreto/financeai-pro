@@ -134,10 +134,11 @@ Cartões cadastrados (últimos 4 dígitos): ${cardDigitsList.length > 0 ? cardDi
 Retorne APENAS um objeto JSON válido com os seguintes campos:
 {
   "description": "descrição do estabelecimento ou beneficiário (extraia o nome do estabelecimento sem prefixos ou sufixos como 'em', 'no', etc.)",
-  "amount": valor numérico da transação,
+  "amount": valor numérico da transação POR PARCELA (se houver parcelamento, divida o valor total pelo número de parcelas),
   "date": "data no formato YYYY-MM-DD",
   "type": "expense" ou "income" ou "investment",
-  "category": "categoria sugerida (alimentacao, transporte, compras, saude, lazer, salario, outros)",
+  "category": "categoria sugerida (alimentacao, transporte, compras, saude, lazer, contas, educacao, salario, outros)",
+  "payment_method": "meio de pagamento (credit_card, debit_card, pix, transfer, boleto_bancario)",
   "card_last_digits": "últimos 4 dígitos do cartão se mencionado, ou null",
   "card_id": "ID do cartão se os dígitos corresponderem a um cartão cadastrado, ou null",
   "installments": número de parcelas se mencionado ou 1,
@@ -145,17 +146,47 @@ Retorne APENAS um objeto JSON válido com os seguintes campos:
   "bank_name": "nome do banco remetente do SMS (CAIXA, Nubank, etc.) ou null"
 }
 
-IMPORTANTE:
-- Extraia o nome do estabelecimento de forma limpa (ex: "LA BRASILERIE" em vez de "em LA BRASILERIE")
-- Para estabelecimentos de alimentação (restaurantes, padarias, lanchonetes, etc.), use categoria "alimentacao"
-- Se os últimos 4 dígitos do cartão corresponderem a algum dos cartões cadastrados, use o card_id correspondente
-- Para PIX recebido, type deve ser "income"
-- Para PIX enviado ou compras, type deve ser "expense"
-- Valores devem ser numéricos (sem R$ ou formatação)
-- Datas devem estar no formato YYYY-MM-DD
-- Se a data tiver apenas DD/MM, use o ano atual (${new Date().getFullYear()})
-- Datas no formato DD/MM significam dia/mês (ex: 09/10 = 9 de outubro, não 10 de setembro)
-- Retorne APENAS o JSON, sem texto adicional`;
+REGRAS IMPORTANTES:
+1. ESTABELECIMENTO/DESCRIÇÃO:
+   - Extraia o nome do estabelecimento de forma limpa, removendo prefixos como "em", "no", "na"
+   - Exemplo: "em LA BRASILERIE" → "LA BRASILERIE"
+   - Exemplo: "no RESTAURANTE XYZ" → "RESTAURANTE XYZ"
+
+2. CATEGORIZAÇÃO:
+   - Restaurantes, padarias, lanchonetes, brasilerie, pizzaria, bar, café, food, açaí → "alimentacao"
+   - Uber, taxi, posto, gasolina, estacionamento, pedágio → "transporte"
+   - Farmácia, hospital, clínica, drogaria, plano de saúde → "saude"
+   - Shopping, loja, magazine, Mercado Livre, Amazon → "compras"
+   - Cinema, teatro, Netflix, Spotify, show, academia → "lazer"
+   - Luz, energia, água, internet, telefone, celular → "contas"
+   - Escola, faculdade, curso, livro → "educacao"
+   - Salário, pagamento, vencimento, folha → "salario"
+
+3. MEIO DE PAGAMENTO (payment_method):
+   - Se o SMS contém "PIX" → "pix"
+   - Se o SMS contém "débito" ou "debit" → "debit_card"
+   - Se o SMS contém "transferência", "TED", "DOC" → "transfer"
+   - Se o SMS contém "boleto" → "boleto_bancario"
+   - PADRÃO (se nada acima for encontrado) → "credit_card"
+
+4. PARCELAMENTO:
+   - Se o SMS menciona "em 3 vezes" ou "3x", installments = 3
+   - Se o valor individual da parcela está explícito (ex: "3x de R$ 100"), use esse valor em "amount"
+   - Se apenas o número de parcelas está mencionado (ex: "R$ 300 em 3 vezes"), divida o valor total pelo número de parcelas
+   - Exemplo: "R$ 457,00 em 2 vezes" → amount = 228.50, installments = 2
+
+5. FORMATO DOS DADOS:
+   - Valores devem ser numéricos (sem R$ ou formatação)
+   - Datas devem estar no formato YYYY-MM-DD
+   - Se a data tiver apenas DD/MM, use o ano atual (${new Date().getFullYear()})
+   - Datas no formato DD/MM significam dia/mês (ex: 09/10 = 9 de outubro, não 10 de setembro)
+
+6. TIPO DE TRANSAÇÃO:
+   - PIX recebido → type = "income"
+   - PIX enviado ou compras → type = "expense"
+   - Salário → type = "income"
+
+Retorne APENAS o JSON, sem texto adicional ou markdown.`;
 
   try {
     let response;
@@ -222,7 +253,10 @@ const extractFromSMSBasic = (smsText, cards = []) => {
   
   // Extract amount
   const amountMatch = text.match(/R\$?\s*([\d.,\s]+?)(?:\s+em|\s+\d{1,2}\/|$)/);
-  const amount = amountMatch ? parseAmount(amountMatch[1]) : 0;
+  let amount = 0;
+  if (amountMatch) {
+    amount = parseAmount(amountMatch[1]);
+  }
   
   // Extract date (DD/MM format is standard in Brazil)
   const dateMatch = text.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
@@ -273,19 +307,42 @@ const extractFromSMSBasic = (smsText, cards = []) => {
     }
   }
   
-  // Extract installments
+  // Extract installments and adjust amount
   const installmentsMatch = text.match(/em\s+(\d+)\s+vezes/i);
   const installments = installmentsMatch ? parseInt(installmentsMatch[1]) : 1;
+  
+  // If installments detected, divide the total amount
+  if (installments > 1) {
+    amount = amount / installments;
+  }
+  
+  // Detect payment method with default to credit_card
+  let paymentMethod = 'credit_card'; // Default
+  if (/\bpix\b/i.test(text)) {
+    paymentMethod = 'pix';
+  } else if (/d[eé]bito|debit/i.test(text)) {
+    paymentMethod = 'debit_card';
+  } else if (/transfer[êe]ncia|ted|doc/i.test(text)) {
+    paymentMethod = 'transfer';
+  } else if (/boleto/i.test(text)) {
+    paymentMethod = 'boleto_bancario';
+  }
   
   // Categorize based on description
   let category = 'outros';
   const descLower = description.toLowerCase();
-  if (/(restaurante|lanchonete|padaria|brasilerie|pizzaria|bar|cafe|food)/i.test(descLower)) {
+  if (/(restaurante|lanchonete|padaria|brasilerie|pizzaria|bar|cafe|food|acai|açai|churrascaria|cantina|sushi)/i.test(descLower)) {
     category = 'alimentacao';
-  } else if (/(uber|99|taxi|posto|gasolina)/i.test(descLower)) {
+  } else if (/(uber|99|taxi|posto|gasolina|estacionamento|pedagio|pedágio)/i.test(descLower)) {
     category = 'transporte';
-  } else if (/(farmacia|hospital|clinica|drogaria)/i.test(descLower)) {
+  } else if (/(farmacia|farmácia|hospital|clinica|clínica|drogaria)/i.test(descLower)) {
     category = 'saude';
+  } else if (/(shopping|loja|magazine)/i.test(descLower)) {
+    category = 'compras';
+  } else if (/(cinema|teatro|netflix|spotify|lazer|academia)/i.test(descLower)) {
+    category = 'lazer';
+  } else if (/(luz|energia|agua|água|internet|telefone|celular|conta)/i.test(descLower)) {
+    category = 'contas';
   }
   
   return {
@@ -294,6 +351,7 @@ const extractFromSMSBasic = (smsText, cards = []) => {
     date,
     type,
     category,
+    payment_method: paymentMethod,
     card_last_digits: cardDigits,
     card_id: cardId,
     installments,

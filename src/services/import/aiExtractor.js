@@ -267,33 +267,38 @@ export const categorizeTransaction = (description) => {
   const desc = description.toLowerCase();
   
   // Shopping (check before food to catch "mercado livre")
-  if (/(shopping|loja|magazine|mercado\s*livre|amazon|shopee)/i.test(desc)) {
+  if (/(shopping|loja|magazine|mercado\s*livre|amazon|shopee|americanas|casas\s*bahia)/i.test(desc)) {
     return 'compras';
   }
   
   // Food & Dining - Enhanced to better detect restaurants and food establishments
-  if (/(restaurante|lanchonete|padaria|mercado|supermercado|ifood|uber\s*eats|rappi|brasilerie|pizzaria|bar|cafe|cafeteria|lanches|hamburgueria|confeitaria|doceria|sorveteria|food)/i.test(desc)) {
+  if (/(restaurante|lanchonete|padaria|mercado|supermercado|ifood|uber\s*eats|rappi|brasilerie|pizzaria|bar|cafe|cafeteria|lanches|hamburgueria|confeitaria|doceria|sorveteria|food|acai|açai|churrascaria|cantina|sushi)/i.test(desc)) {
     return 'alimentacao';
   }
   
   // Transportation
-  if (/(uber|99|taxi|combustivel|gasolina|posto|estacionamento|pedagio|pedágio)/i.test(desc)) {
+  if (/(uber|99|taxi|combustivel|gasolina|posto|estacionamento|pedagio|pedágio|transporte|onibus|ônibus|metrô|metro)/i.test(desc)) {
     return 'transporte';
   }
   
   // Bills & Utilities
-  if (/(luz|energia|agua|água|internet|telefone|celular|conta|fatura)/i.test(desc)) {
+  if (/(luz|energia|agua|água|internet|telefone|celular|conta|fatura|condominio|condomínio)/i.test(desc)) {
     return 'contas';
   }
   
   // Health
-  if (/(farmacia|farmácia|hospital|clinica|clínica|medico|médico|plano\s*de?\s*saude|plano\s*de?\s*saúde|drogaria)/i.test(desc)) {
+  if (/(farmacia|farmácia|hospital|clinica|clínica|medico|médico|plano\s*de?\s*saude|plano\s*de?\s*saúde|drogaria|laboratorio|laboratório)/i.test(desc)) {
     return 'saude';
   }
   
   // Entertainment
-  if (/(cinema|teatro|netflix|spotify|show|evento|ingresso)/i.test(desc)) {
+  if (/(cinema|teatro|netflix|spotify|show|evento|ingresso|lazer|academia|gym)/i.test(desc)) {
     return 'lazer';
+  }
+  
+  // Education
+  if (/(escola|faculdade|universidade|curso|livro|livraria)/i.test(desc)) {
+    return 'educacao';
   }
   
   // Salary
@@ -306,6 +311,7 @@ export const categorizeTransaction = (description) => {
 
 /**
  * Detect payment method from description or payment method field
+ * Defaults to 'credit_card' unless PIX, débito, or other keywords are present
  * @param {String} paymentMethodField - Payment method field value
  * @param {String} description - Transaction description
  * @param {String} transactionType - Transaction type (expense, income, investment)
@@ -348,11 +354,8 @@ export const detectPaymentMethod = (paymentMethodField, description, transaction
       return 'pix';
     }
     // Check for debit card first (more specific pattern)
-    if (/(cartao\s*debito|cartão\s*débito|debit\s*card)/i.test(normalizedDesc)) {
+    if (/(cartao\s*debito|cartão\s*débito|debit\s*card|d[eé]bito)/i.test(normalizedDesc)) {
       return 'debit_card';
-    }
-    if (/(cartao|cartão|card|credito|crédito)/i.test(normalizedDesc) && !/(debito|débito|debit)/i.test(normalizedDesc)) {
-      return 'credit_card';
     }
     if (/(ted|doc|transferencia|transferência)/i.test(normalizedDesc)) {
       return 'transfer';
@@ -370,7 +373,12 @@ export const detectPaymentMethod = (paymentMethodField, description, transaction
     return null; // Will be selected manually
   }
   
-  return null; // Needs manual selection
+  // Default to credit_card for expenses as per requirements
+  if (transactionType === 'expense') {
+    return 'credit_card';
+  }
+  
+  return null; // For income or other cases, needs manual selection
 };
 
 /**

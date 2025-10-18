@@ -45,12 +45,14 @@ describe('SMS Extractor Service', () => {
 
       expect(result).not.toBeNull();
       expect(result.description).toBe('RAFAEL FERNANDES SALE');
-      expect(result.amount).toBe(457);
+      expect(result.amount).toBe(228.5); // Divided by 2 installments
+      expect(result.installments).toBe(2);
       expect(result.type).toBe('expense');
       expect(result.payment_method).toBe('credit_card');
       expect(result.origin).toBe('sms_import');
       expect(result.bank_name).toBe('CAIXA');
       expect(result.card_last_digits).toBe('1527');
+      expect(result.category).toBeDefined(); // Should have a category
     });
 
     it('deve extrair transação do formato Nubank', () => {
@@ -141,6 +143,76 @@ describe('SMS Extractor Service', () => {
       expect(result).not.toBeNull();
       expect(result.bank_name).toBe('CAIXA');
       expect(result.card_last_digits).toBe('1234');
+    });
+
+    it('deve categorizar estabelecimentos de alimentação', () => {
+      const sms1 = 'CAIXA: Compra aprovada LA BRASILERIE R$ 47,20 09/10 às 06:49, ELO final 1527';
+      const result1 = extractFromSMS(sms1);
+      
+      expect(result1).not.toBeNull();
+      expect(result1.category).toBe('alimentacao');
+      
+      const sms2 = 'CAIXA: Compra aprovada PIZZARIA BELLA R$ 80,00 10/10 às 19:00, ELO final 1234';
+      const result2 = extractFromSMS(sms2);
+      
+      expect(result2).not.toBeNull();
+      expect(result2.category).toBe('alimentacao');
+    });
+
+    it('deve categorizar estabelecimentos de transporte', () => {
+      const sms = 'CAIXA: Compra aprovada UBER TRIP R$ 25,00 10/10 às 08:30, ELO final 1234';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.category).toBe('transporte');
+    });
+
+    it('deve categorizar estabelecimentos de saúde', () => {
+      const sms = 'CAIXA: Compra aprovada FARMACIA POPULAR R$ 35,00 10/10 às 15:00, ELO final 1234';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.category).toBe('saude');
+    });
+
+    it('deve detectar PIX como meio de pagamento', () => {
+      const sms = 'Você enviou um Pix de R$ 100,00 para Maria Santos em 10/03 às 10:15';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.payment_method).toBe('pix');
+    });
+
+    it('deve detectar débito como meio de pagamento', () => {
+      const sms = 'Débito de R$ 45,00 em ESTABELECIMENTO em 05/03';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.payment_method).toBe('debit_card');
+    });
+
+    it('deve usar credit_card como padrão quando não há PIX ou débito', () => {
+      const sms = 'CAIXA: Compra aprovada LOJA XYZ R$ 100,00 10/10 às 14:00, ELO final 1234';
+      const result = extractFromSMS(sms);
+      
+      expect(result).not.toBeNull();
+      expect(result.payment_method).toBe('credit_card');
+    });
+
+    it('deve dividir valor por número de parcelas quando especificado', () => {
+      const sms1 = 'CAIXA: Compra aprovada LOJA ABC R$ 300,00 em 3 vezes, 10/10 às 14:00, ELO final 1234';
+      const result1 = extractFromSMS(sms1);
+      
+      expect(result1).not.toBeNull();
+      expect(result1.amount).toBe(100); // 300 / 3
+      expect(result1.installments).toBe(3);
+      
+      const sms2 = 'CAIXA: Compra aprovada LOJA DEF R$ 600,00 em 6 vezes, 10/10 às 15:00, ELO final 5678';
+      const result2 = extractFromSMS(sms2);
+      
+      expect(result2).not.toBeNull();
+      expect(result2.amount).toBe(100); // 600 / 6
+      expect(result2.installments).toBe(6);
     });
   });
 
