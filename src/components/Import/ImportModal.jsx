@@ -275,8 +275,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         .concat(Object.values(categories.income || []))
         .concat(Object.values(categories.investment || []));
       
-      // Extract transaction from photo
-      const transaction = await extractFromPhoto(photoFile, aiConfig, cards, categoryList);
+      // Extract transaction from photo (pass userId for historical context)
+      const transaction = await extractFromPhoto(photoFile, aiConfig, cards, categoryList, user?.id);
       
       if (!transaction) {
         setError('Não foi possível extrair dados da foto. Tente outra imagem.');
