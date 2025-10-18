@@ -458,11 +458,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setError('');
 
     try {
-      // Extrair dados do contracheque
+      // Extrair dados do contracheque (pass userId for historical context)
       const categoryList = Object.values(categories.expense || [])
         .concat(Object.values(categories.income || []));
       
-      const result = await extractFromPaycheck(paycheckFile, aiConfig, categoryList);
+      const result = await extractFromPaycheck(paycheckFile, aiConfig, categoryList, user?.id);
       
       if (!result || !result.transactions || result.transactions.length === 0) {
         setError('Não foi possível extrair dados do contracheque. Verifique se o arquivo é válido.');
