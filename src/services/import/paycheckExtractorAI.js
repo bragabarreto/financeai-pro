@@ -111,63 +111,214 @@ export const extractFromPaycheck = async (file, aiConfig, availableCategories = 
       model: aiConfig.model || 'gemini-2.0-flash-exp'
     });
     
-    // Prompt detalhado para extração
-    const prompt = `Você é um assistente especializado em análise de contracheques brasileiros.
+    // Build category names for context
+    const categoryNames = availableCategories.map(c => c.name).join(', ');\n    \n    // Prompt detalhado e otimizado para extração
+    const prompt = `Você é um assistente especializado em análise e extração de dados de contracheques brasileiros.
 
-Analise este contracheque e extraia TODAS as informações em formato JSON estruturado.
+Sua tarefa é analisar este contracheque (PDF ou imagem) e extrair TODAS as informações financeiras com MÁXIMA PRECISÃO.
 
-IMPORTANTE:
-1. Separe claramente CRÉDITOS (receitas/proventos) de DÉBITOS (descontos)
-2. Para cada item, extraia: rubrica, descrição, mês/referência, quantidade, parcela, valor
-3. Identifique o mês/ano do contracheque
-4. Extraia nome do funcionário, CPF, órgão/empresa
-5. Calcule totais: bruto, descontos, líquido
-6. Identifique pensão alimentícia (marque com flag especial)
+CATEGORIAS REGISTRADAS PELO USUÁRIO:
+${categoryNames || 'Nenhuma categoria registrada - use "outros"'}
 
-Retorne APENAS um JSON válido no seguinte formato:
+INSTRUÇÕES DETALHADAS:
+
+1. METADADOS DO CONTRACHEQUE:
+   - Identifique o mês e ano de referência (MÊS/ANO do pagamento)
+   - Extraia nome completo do funcionário
+   - Extraia CPF (formato: 000.000.000-00)
+   - Extraia nome do órgão/empresa empregadora
+   - Calcule: valor bruto total, total de descontos, valor líquido
+
+2. CRÉDITOS (RECEITAS/PROVENTOS):
+   Para cada item de crédito, extraia:
+   - Rubrica/código (se houver)
+   - Descrição completa e clara
+   - Mês de referência (se diferente do mês de pagamento)
+   - Quantidade (número de dias, horas, etc.)
+   - Parcela (se for pagamento parcelado)
+   - Valor em decimal (ex: 5432.10)
+   
+   Tipos comuns de créditos:
+   - Salário base, subsídio, vencimento
+   - Gratificações (GECJ, GAJ, etc.)
+   - Auxílios (alimentação, transporte, creche, etc.)
+   - Horas extras, adicional noturno
+   - Férias, 1/3 de férias
+   - 13º salário
+   - Bônus, prêmios
+
+3. DÉBITOS (DESCONTOS):
+   Para cada item de débito, extraia:
+   - Rubrica/código (se houver)
+   - Descrição completa e clara
+   - Mês de referência (se aplicável)
+   - Quantidade
+   - Parcela (se for desconto parcelado)
+   - Valor em decimal (ex: 543.21)
+   - is_alimony: true APENAS para pensão alimentícia
+   
+   Tipos comuns de débitos:
+   - INSS, previdência (RPPS, Funpresp)
+   - Imposto de Renda (IR, IRRF)
+   - Plano de saúde (Unimed, Bradesco Saúde, etc.)
+   - Plano odontológico
+   - Seguros (vida, invalidez)
+   - Empréstimos consignados
+   - **PENSÃO ALIMENTÍCIA** (marque is_alimony=true)
+   - Contribuição sindical
+   - Outros descontos
+
+4. CÁLCULO DOS TOTAIS:
+   - gross_amount = soma de TODOS os créditos
+   - deductions_amount = soma de TODOS os débitos
+   - net_amount = gross_amount - deductions_amount
+   - IMPORTANTE: Valide se net_amount bate com "valor líquido" do contracheque
+
+5. FORMATAÇÃO DE VALORES:
+   - Converta R$ 1.234,56 → 1234.56
+   - Converta 1.234,56 → 1234.56
+   - Sempre use ponto decimal (não vírgula)
+   - NUNCA inclua R$, pontos de milhar ou espaços
+
+6. IDENTIFICAÇÃO DE PENSÃO ALIMENTÍCIA:
+   Marque is_alimony=true se a descrição contiver:
+   - "pensão", "alimentícia", "alimentos"
+   - "pensao", "alimenticia"
+   
+RETORNE APENAS UM OBJETO JSON VÁLIDO (sem texto adicional, sem markdown, sem explicações):
 
 {
   "metadata": {
     "month": 10,
     "year": 2025,
-    "employee_name": "Nome do Funcionário",
-    "cpf": "000.000.000-00",
-    "employer": "Nome do Órgão/Empresa",
-    "gross_amount": 0.00,
-    "deductions_amount": 0.00,
-    "net_amount": 0.00
+    "employee_name": "Nome Completo do Funcionário",
+    "cpf": "123.456.789-00",
+    "employer": "Nome do Órgão ou Empresa",
+    "gross_amount": 12345.67,
+    "deductions_amount": 3456.78,
+    "net_amount": 8888.89
   },
   "credits": [
     {
-      "rubric": "código",
-      "description": "Descrição completa",
-      "month_ref": "MM/YYYY",
-      "quantity": 0,
+      "rubric": "001",
+      "description": "Subsídio",
+      "month_ref": "10/2025",
+      "quantity": 30,
       "installment": 0,
-      "amount": 0.00
+      "amount": 10000.00
     }
   ],
   "debits": [
     {
-      "rubric": "código",
-      "description": "Descrição completa",
-      "month_ref": "MM/YYYY",
+      "rubric": "101",
+      "description": "INSS",
+      "month_ref": "10/2025",
       "quantity": 0,
       "installment": 0,
-      "amount": 0.00,
+      "amount": 1100.00,
       "is_alimony": false
+    },
+    {
+      "rubric": "199",
+      "description": "Pensão Alimentícia",
+      "month_ref": "10/2025",
+      "quantity": 0,
+      "installment": 0,
+      "amount": 2000.00,
+      "is_alimony": true
     }
   ]
 }
 
-REGRAS:
-- Valores devem ser números (sem R$, sem pontos de milhar, use ponto decimal)
-- Se não houver rubrica, use string vazia
-- Se não houver quantidade/parcela, use 0
-- Marque is_alimony=true apenas para pensão alimentícia
-- Seja preciso com os valores
+EXEMPLO DE EXTRAÇÃO:
 
-Analise o contracheque agora:`;
+[Contracheque com vários itens]
+{
+  "metadata": {
+    "month": 10,
+    "year": 2025,
+    "employee_name": "João da Silva Santos",
+    "cpf": "123.456.789-00",
+    "employer": "Tribunal Regional Federal",
+    "gross_amount": 25000.00,
+    "deductions_amount": 6500.00,
+    "net_amount": 18500.00
+  },
+  "credits": [
+    {
+      "rubric": "001",
+      "description": "Subsídio",
+      "month_ref": "10/2025",
+      "quantity": 30,
+      "installment": 0,
+      "amount": 20000.00
+    },
+    {
+      "rubric": "010",
+      "description": "Auxílio Alimentação",
+      "month_ref": "10/2025",
+      "quantity": 22,
+      "installment": 0,
+      "amount": 1000.00
+    },
+    {
+      "rubric": "015",
+      "description": "Auxílio Transporte",
+      "month_ref": "10/2025",
+      "quantity": 22,
+      "installment": 0,
+      "amount": 500.00
+    },
+    {
+      "rubric": "020",
+      "description": "GECJ - Gratificação",
+      "month_ref": "10/2025",
+      "quantity": 1,
+      "installment": 0,
+      "amount": 3500.00
+    }
+  ],
+  "debits": [
+    {
+      "rubric": "101",
+      "description": "INSS - Contribuição Previdenciária",
+      "month_ref": "10/2025",
+      "quantity": 0,
+      "installment": 0,
+      "amount": 2200.00,
+      "is_alimony": false
+    },
+    {
+      "rubric": "102",
+      "description": "Imposto de Renda Retido na Fonte",
+      "month_ref": "10/2025",
+      "quantity": 0,
+      "installment": 0,
+      "amount": 1800.00,
+      "is_alimony": false
+    },
+    {
+      "rubric": "150",
+      "description": "Plano de Saúde Unimed",
+      "month_ref": "10/2025",
+      "quantity": 0,
+      "installment": 0,
+      "amount": 500.00,
+      "is_alimony": false
+    },
+    {
+      "rubric": "199",
+      "description": "Pensão Alimentícia",
+      "month_ref": "10/2025",
+      "quantity": 0,
+      "installment": 0,
+      "amount": 2000.00,
+      "is_alimony": true
+    }
+  ]
+}
+
+AGORA ANALISE O CONTRACHEQUE E RETORNE APENAS O JSON:`;
 
     // Chamar API Gemini
     console.log('🤖 Chamando API Gemini para análise...');
