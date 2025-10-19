@@ -122,11 +122,19 @@ INSTRUÇÕES DETALHADAS DE EXTRAÇÃO:
    - Cartão: procure por "aprovada", "últimos dígitos", "final 1234"
    - Transferência: procure por TED, DOC, transferência
 
-2. DESCRIÇÃO/ESTABELECIMENTO:
-   - Para PIX: extraia o nome do PAGADOR (se recebeu) ou BENEFICIÁRIO (se enviou)
-   - Para compra: extraia o nome do ESTABELECIMENTO de forma limpa
-   - Remova prefixos como "para", "de", "em"
-   - Se houver razão social e nome fantasia, prefira o nome fantasia
+2. DESCRIÇÃO/ESTABELECIMENTO (PRIORIDADE MÁXIMA):
+   - **SEMPRE extraia o nome COMPLETO do estabelecimento, pagador ou beneficiário**
+   - **NUNCA use abreviações ou siglas, sempre o nome completo e detalhado**
+   - **PRESERVE todos os nomes, inclusive razão social completa e sufixos (Ltda, ME, SA, etc.)**
+   - Para PIX: extraia o nome COMPLETO do PAGADOR (se recebeu) ou BENEFICIÁRIO (se enviou)
+   - Para compra: extraia o nome COMPLETO do ESTABELECIMENTO
+   - Remova APENAS prefixos desnecessários como "para", "de", "em"
+   - **Este campo é CRÍTICO para categorização precisa - seja o mais completo e detalhado possível**
+   - Se houver razão social E nome fantasia, prefira incluir ambos ou o mais completo
+   - Exemplos:
+     * "PIX para SUPERMERCADO BOM PREÇO LTDA" → "SUPERMERCADO BOM PREÇO LTDA" 
+     * "Compra em RESTAURANTE LA BRASILERIE" → "RESTAURANTE LA BRASILERIE"
+     * "Transferência para JOÃO SILVA SANTOS" → "JOÃO SILVA SANTOS"
 
 3. VALOR:
    - Procure por "R$" seguido de números
@@ -156,8 +164,10 @@ INSTRUÇÕES DETALHADAS DE EXTRAÇÃO:
    - "boleto" = Boleto Bancário
 
 7. CATEGORIA:
+   - **Use a DESCRIÇÃO COMPLETA extraída no item 2 como contexto principal para categorização**
    - Escolha ESTRITAMENTE entre as categorias registradas pelo usuário
    - Use o contexto histórico se a descrição for similar
+   - Analise o nome completo do estabelecimento/beneficiário para sugerir a melhor categoria
    - Se for compra em mercado/supermercado → "alimentacao" (se disponível)
    - Se for restaurante/lanchonete → "alimentacao" (se disponível)
    - Se for posto/combustivel → "transporte" (se disponível)
@@ -188,7 +198,7 @@ INSTRUÇÕES DETALHADAS DE EXTRAÇÃO:
 RETORNE APENAS UM OBJETO JSON VÁLIDO (sem texto adicional, sem markdown, sem explicações):
 
 {
-  "description": "Nome estabelecimento/beneficiário/pagador",
+  "description": "Nome COMPLETO do estabelecimento/beneficiário/pagador (sem abreviações, preservando razão social e sufixos)",
   "amount": 0.00,
   "date": "YYYY-MM-DD",
   "time": "HH:MM ou null",
@@ -208,7 +218,7 @@ EXEMPLOS:
 
 [Imagem: Comprovante PIX enviado]
 {
-  "description": "Maria Silva",
+  "description": "Maria Silva Santos",
   "amount": 150.00,
   "date": "${currentYear}-10-15",
   "time": "14:30",
@@ -216,7 +226,7 @@ EXEMPLOS:
   "transaction_type": "pix",
   "category": "outros",
   "card_last_digits": null,
-  "beneficiary": "Maria Silva",
+  "beneficiary": "Maria Silva Santos",
   "payer": null,
   "pix_key": "maria@email.com",
   "transaction_id": "E12345678901234567890123456789012345",
@@ -226,7 +236,7 @@ EXEMPLOS:
 
 [Imagem: Notificação cartão]
 {
-  "description": "SUPERMERCADO BOM PRECO",
+  "description": "SUPERMERCADO BOM PRECO LTDA",
   "amount": 287.50,
   "date": "${currentYear}-10-20",
   "time": "18:45",
