@@ -231,10 +231,13 @@ Available Categories: ${categoryNames}
 Available Cards: ${cardNames || 'None'}
 Available Accounts: ${accountNames || 'None'}
 
-IMPORTANT: You MUST select the category ONLY from the Available Categories list above. Do not suggest categories that are not in this list.
+IMPORTANT INSTRUCTIONS:
+1. You MUST select the category ONLY from the Available Categories list above. Do not suggest categories that are not in this list.
+2. Analyze the COMPLETE DESCRIPTION provided to understand the nature of the transaction and suggest the most appropriate category.
+3. The description field contains the full name of the establishment or party involved - use this complete information for accurate categorization.
 
-Based on the payment method and description, identify:
-1. The most suitable category from the Available Categories list
+Based on the payment method and COMPLETE description, identify:
+1. The most suitable category from the Available Categories list (use the full description as primary context)
 2. If payment_method is "credit_card", which card was likely used (match card name from description if possible)
 3. If payment_method is "debit_card", "pix", "transfer", etc., which account was likely used
 
@@ -242,7 +245,7 @@ Provide your response in JSON format:
 {
   "category": "suggested category name (MUST be from Available Categories list)",
   "confidence": 0-100,
-  "reasoning": "brief explanation",
+  "reasoning": "brief explanation mentioning the complete description analysis",
   "suggested_card": "card name if credit_card payment, otherwise null",
   "suggested_account": "account name if account payment, otherwise null"
 }`;

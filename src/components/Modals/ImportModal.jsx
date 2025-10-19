@@ -248,6 +248,13 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                   Você pode editar qualquer campo antes de confirmar a importação.
                 </p>
               </div>
+              
+              <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>📝 Descrições Completas:</strong> A IA extraiu os nomes completos dos estabelecimentos/envolvidos nas transações. 
+                  Essas descrições são usadas para sugerir as categorias mais adequadas.
+                </p>
+              </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -282,6 +289,8 @@ const ImportModal = ({ show, onClose, onSave, categories, accounts, userId }) =>
                             value={transaction.description}
                             onChange={(e) => handleTransactionUpdate(index, 'description', e.target.value)}
                             className="w-full px-2 py-1 border rounded text-sm"
+                            title="Nome completo do estabelecimento ou envolvido na transação"
+                            placeholder="Nome completo..."
                           />
                         </td>
                         <td className="px-4 py-3 text-sm">

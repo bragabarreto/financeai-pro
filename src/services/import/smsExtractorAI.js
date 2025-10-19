@@ -116,13 +116,18 @@ ${categoryNames || 'Nenhuma categoria registrada - use "outros"'}${contextSectio
 
 INSTRUÇÕES DETALHADAS:
 
-1. DESCRIÇÃO/ESTABELECIMENTO:
-   - Extraia o nome do estabelecimento ou beneficiário de forma LIMPA
-   - Remova prefixos como "em", "no", "na", "para", "de"
+1. DESCRIÇÃO/ESTABELECIMENTO (PRIORIDADE MÁXIMA):
+   - **SEMPRE extraia o nome COMPLETO do estabelecimento ou beneficiário**
+   - **NUNCA use abreviações ou siglas, sempre o nome completo**
+   - **PRESERVE todos os nomes, inclusive razão social completa**
+   - Remova APENAS prefixos como "em", "no", "na", "para", "de"
+   - **Este campo é CRÍTICO para categorização precisa - seja o mais detalhado possível**
    - Exemplos:
-     * "Compra aprovada em LA BRASILERIE" → "LA BRASILERIE"
-     * "Compra no cartao PADARIA SAO JOSE" → "PADARIA SAO JOSE"
-     * "PIX para MARIA SILVA" → "MARIA SILVA"
+     * "Compra aprovada em LA BRASILERIE" → "LA BRASILERIE" (nome completo)
+     * "Compra no cartao PADARIA SAO JOSE" → "PADARIA SAO JOSE" (nome completo)
+     * "PIX para MARIA SILVA" → "MARIA SILVA" (nome completo)
+     * "Mercado ABC Ltda" → "Mercado ABC Ltda" (preserve Ltda)
+     * "Restaurante Bom Sabor ME" → "Restaurante Bom Sabor ME" (preserve ME)
 
 2. VALOR:
    - Converta para número decimal (sem R$, sem formatação)
@@ -142,8 +147,10 @@ INSTRUÇÕES DETALHADAS:
    - "investment" = Aplicações, investimentos
 
 5. CATEGORIA:
+   - **Use a DESCRIÇÃO COMPLETA extraída no item 1 como contexto principal**
    - Escolha APENAS entre as categorias registradas pelo usuário
    - Use o contexto histórico para categorias similares
+   - Analise o nome completo do estabelecimento para sugerir a melhor categoria
    - Se nenhuma categoria se encaixar perfeitamente, escolha a mais próxima
    - Se não houver categorias ou nenhuma se encaixar, use "outros"
    - NUNCA invente categorias que não estão na lista
@@ -164,7 +171,7 @@ INSTRUÇÕES DETALHADAS:
 RETORNE APENAS UM OBJETO JSON VÁLIDO (sem texto adicional, sem markdown):
 
 {
-  "description": "Nome do estabelecimento/beneficiário (limpo, sem prefixos)",
+  "description": "Nome COMPLETO do estabelecimento/beneficiário (sem abreviações, nome completo preservado)",
   "amount": 0.00,
   "date": "YYYY-MM-DD",
   "type": "expense|income|investment",
@@ -191,10 +198,10 @@ Saída:
   "bank_name": "CAIXA"
 }
 
-Entrada: "Santander: Compra no cartao final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA, aprovada."
+Entrada: "Santander: Compra no cartao final 0405, de R$ 66,00, em 17/10/25, às 18:53, em COMERCIAL CASA LTDA, aprovada."
 Saída:
 {
-  "description": "COMERCIAL CASA",
+  "description": "COMERCIAL CASA LTDA",
   "amount": 66.00,
   "date": "2025-10-17",
   "type": "expense",
@@ -205,10 +212,10 @@ Saída:
   "bank_name": "Santander"
 }
 
-Entrada: "Você recebeu um Pix de R$ 250,00 de João Silva em 15/10"
+Entrada: "Você recebeu um Pix de R$ 250,00 de João Silva Santos em 15/10"
 Saída:
 {
-  "description": "João Silva",
+  "description": "João Silva Santos",
   "amount": 250.00,
   "date": "${currentYear}-10-15",
   "type": "income",

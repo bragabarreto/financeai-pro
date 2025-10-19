@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import { getTodayLocalDate, formatDateLocal } from '../utils/dateUtils';Client';
+import { supabase } from '../supabaseClient';
+import { getTodayLocalDate, formatDateLocal } from '../utils/dateUtils';
 
 /**
  * Serviço de extração e categorização inteligente de transações
@@ -77,8 +77,8 @@ const calculateCategoryScore = (text, category) => {
 
 /**
  * Sugere categoria baseada exclusivamente nas categorias registradas do usuário
- * A IA escolhe a melhor categoria comparando a descrição da transação com os nomes das categorias
- * @param {string} description - Descrição da transação
+ * A IA escolhe a melhor categoria comparando a descrição COMPLETA da transação com os nomes das categorias
+ * @param {string} description - Descrição COMPLETA da transação (nome completo do estabelecimento/entidade)
  * @param {string} type - Tipo da transação
  * @param {Array} categories - Categorias disponíveis (somente as registradas pelo usuário)
  * @returns {Object|null} Categoria sugerida com score de confiança
@@ -92,7 +92,8 @@ const suggestCategoryByKeywords = (description, type, categories) => {
   let bestMatch = null;
   let bestScore = 0;
 
-  // Comparar descrição da transação com cada categoria registrada
+  // Comparar descrição COMPLETA da transação com cada categoria registrada
+  // A descrição completa fornece mais contexto para melhor categorização
   for (const category of categories) {
     const score = calculateCategoryScore(description, category);
     if (score > bestScore && score > 0.3) {
@@ -243,6 +244,7 @@ const extractFromCSV = (csvContent) => {
     if (values.length < header.length) continue;
 
     const date = dateIndex >= 0 ? parseDate(values[dateIndex]) : getTodayLocalDate();
+    // Preserve the complete description from CSV - this is critical for accurate categorization
     const description = descIndex >= 0 ? values[descIndex].replace(/['"]/g, '') : '';
     const amount = amountIndex >= 0 ? parseFloat(values[amountIndex].replace(/[^\d.-]/g, '')) : 0;
     

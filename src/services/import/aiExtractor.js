@@ -257,8 +257,9 @@ export const detectTransactionType = (typeField, amount, beneficiary = '', depos
 };
 
 /**
- * Categorize transaction based on description
- * @param {String} description - Transaction description
+ * Categorize transaction based on complete description
+ * Uses the full establishment/entity name for better pattern matching
+ * @param {String} description - Complete transaction description
  * @returns {String} Suggested category
  */
 export const categorizeTransaction = (description) => {
@@ -431,6 +432,7 @@ export const extractTransactions = (data, mapping = null, userIdentifier = '') =
   const fieldMapping = mapping || detectFieldMapping(headers);
   
   const transactions = data.map((row, index) => {
+    // Preserve complete description from data - critical for accurate AI categorization
     const description = row[fieldMapping.description] || row[headers.find(h => h.toLowerCase().includes('desc'))] || '';
     const rawAmount = row[fieldMapping.amount] || row[headers.find(h => h.toLowerCase().includes('valor'))] || 0;
     const amount = parseAmount(rawAmount);
@@ -445,9 +447,11 @@ export const extractTransactions = (data, mapping = null, userIdentifier = '') =
     const transaction = {
       originalIndex: index,
       date: parseDate(row[fieldMapping.date] || row[headers.find(h => h.toLowerCase().includes('data'))]),
+      // Preserve full description without truncation or abbreviation
       description: String(description).trim(),
       amount: amount,
       type: transactionType,
+      // Use complete description for better categorization
       category: row[fieldMapping.category] || categorizeTransaction(description),
       payment_method: paymentMethod,
       beneficiary: beneficiary ? String(beneficiary).trim() : null,
