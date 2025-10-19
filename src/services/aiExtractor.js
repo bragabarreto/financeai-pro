@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import { getTodayLocalDate, formatDateLocal } from '../utils/dateUtils';Client';
+import { supabase } from '../supabaseClient';
+import { getTodayLocalDate, formatDateLocal } from '../utils/dateUtils';
 
 /**
  * Serviço de extração e categorização inteligente de transações
