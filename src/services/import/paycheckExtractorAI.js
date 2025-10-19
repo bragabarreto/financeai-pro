@@ -146,7 +146,9 @@ export const extractFromPaycheck = async (file, aiConfig, availableCategories = 
     });
     
     // Build category names for context
-    const categoryNames = availableCategories.map(c => c.name).join(', ');\n    \n    // Prompt detalhado e otimizado para extração
+    const categoryNames = availableCategories.map(c => c.name).join(', ');
+    
+    // Prompt detalhado e otimizado para extração
     const prompt = `Você é um assistente especializado em análise e extração de dados de contracheques brasileiros.
 
 Sua tarefa é analisar este contracheque (PDF ou imagem) e extrair TODAS as informações financeiras com MÁXIMA PRECISÃO.
