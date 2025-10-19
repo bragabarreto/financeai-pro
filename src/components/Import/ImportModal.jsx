@@ -1371,7 +1371,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   <div>
                     <p className="font-semibold text-blue-800">Atenção: Revise as categorias e formas de pagamento</p>
                     <p className="text-sm text-blue-700 mt-1">
-                      As categorias foram automaticamente classificadas com base nas descrições. 
+                      A IA extraiu os <strong>nomes completos</strong> dos estabelecimentos/envolvidos nas transações.
+                      As categorias foram automaticamente classificadas usando essas descrições completas para maior precisão. 
                       Campos com <span className="bg-yellow-100 px-1 rounded">fundo amarelo</span> são sugestões automáticas. 
                       Você pode editar qualquer categoria antes de confirmar a importação.
                       Após editar, o campo perderá o destaque amarelo.
@@ -1510,6 +1511,8 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                             value={transaction.description || ''}
                             onChange={(e) => handleTransactionEdit(index, 'description', e.target.value)}
                             className="w-full p-1 border rounded text-xs"
+                            title="Nome completo do estabelecimento ou envolvido na transação"
+                            placeholder="Nome completo..."
                           />
                         </td>
                         <td className="p-2">
