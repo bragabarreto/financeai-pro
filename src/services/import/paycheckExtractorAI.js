@@ -67,7 +67,43 @@ const suggestCategory = async (description, type, availableCategories, userId = 
       'sindicato': ['sindicato', 'associação', 'contribuição sindical', 'amatra', 'ajufe', 'associacao'],
       'outros': ['devolução', 'desconto', 'ajuste', 'devolucao']
     }
-  };\n  \n  const keywords = keywordMap[type] || {};\n  \n  // Procurar categoria correspondente nas palavras-chave\n  let bestMatch = null;\n  let bestScore = 0;\n  \n  for (const [categoryKey, terms] of Object.entries(keywords)) {\n    // Calcular score de match\n    const matchingTerms = terms.filter(term => desc.includes(term));\n    if (matchingTerms.length > 0) {\n      const score = matchingTerms.length / terms.length;\n      \n      if (score > bestScore) {\n        // Encontrar categoria correspondente nas categorias disponíveis\n        const category = availableCategories.find(c => \n          c.name.toLowerCase().includes(categoryKey) ||\n          categoryKey.includes(c.name.toLowerCase()) ||\n          matchingTerms.some(term => c.name.toLowerCase().includes(term))\n        );\n        \n        if (category) {\n          bestScore = score;\n          bestMatch = {\n            categoryId: category.id,\n            categoryName: category.name,\n            confidence: Math.min(85, 60 + (score * 25)), // 60-85 based on match quality\n            source: 'keywords'\n          };\n        }\n      }\n    }\n  }\n  \n  return bestMatch;\n};
+  };
+  
+  const keywords = keywordMap[type] || {};
+  
+  // Procurar categoria correspondente nas palavras-chave
+  let bestMatch = null;
+  let bestScore = 0;
+  
+  for (const [categoryKey, terms] of Object.entries(keywords)) {
+    // Calcular score de match
+    const matchingTerms = terms.filter(term => desc.includes(term));
+    if (matchingTerms.length > 0) {
+      const score = matchingTerms.length / terms.length;
+      
+      if (score > bestScore) {
+        // Encontrar categoria correspondente nas categorias disponíveis
+        const category = availableCategories.find(c => 
+          c.name.toLowerCase().includes(categoryKey) ||
+          categoryKey.includes(c.name.toLowerCase()) ||
+          matchingTerms.some(term => c.name.toLowerCase().includes(term))
+        );
+        
+        if (category) {
+          bestScore = score;
+          bestMatch = {
+            categoryId: category.id,
+            categoryName: category.name,
+            confidence: Math.min(85, 60 + (score * 25)), // 60-85 based on match quality
+            source: 'keywords'
+          };
+        }
+      }
+    }
+  }
+  
+  return bestMatch;
+};
 
 /**
  * Detecta se é pensão alimentícia
