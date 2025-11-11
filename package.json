@@ -20,7 +20,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "proxy": "node server/anthropic-proxy.js",
-    "dev": "concurrently \"npm run proxy\" \"npm start\" --names \"proxy,app\" --prefix-colors \"cyan,green\""
+    "dev": "concurrently \"npm run proxy\" \"npm start\" --names \"proxy,app\" --prefix-colors \"cyan,green\"",
+    "test:proxy": "node test-proxy-connection.js"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
