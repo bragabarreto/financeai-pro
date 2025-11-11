@@ -14,6 +14,11 @@
 const express = require('express');
 const cors = require('cors');
 
+// Ensure fetch is available in Node environments < 18
+const fetchFn = global.fetch || ((...args) =>
+  import('node-fetch').then(({ default: fetch }) => fetch(...args))
+);
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -38,51 +43,51 @@ app.post('/anthropic-proxy', async (req, res) => {
 
     // Validate required fields
     if (!apiKey) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'API key is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'API key is required'
       });
     }
 
     if (!model) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Model is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Model is required'
       });
     }
 
     if (!prompt) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Prompt is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Prompt is required'
       });
     }
 
     // Build message content
-    let messageContent;
-    if (image) {
-      // Vision API with image
-      messageContent = [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: 'image/jpeg',
-            data: image
+    const messageContent = image
+      ? [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/jpeg',
+              data: image
+            }
+          },
+          {
+            type: 'text',
+            text: prompt
           }
-        },
-        {
-          type: 'text',
-          text: prompt
-        }
-      ];
-    } else {
-      // Text-only API
-      messageContent = prompt;
-    }
+        ]
+      : [
+          {
+            type: 'text',
+            text: prompt
+          }
+        ];
 
     // Make request to Anthropic API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetchFn('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -90,9 +95,9 @@ app.post('/anthropic-proxy', async (req, res) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: model,
+        model,
         max_tokens: maxTokens,
-        temperature: image ? 0.1 : undefined, // Use temperature for vision
+        temperature: image ? 0.1 : undefined,
         messages: [{ role: 'user', content: messageContent }]
       })
     });
@@ -108,9 +113,8 @@ app.post('/anthropic-proxy', async (req, res) => {
 
     res.json({
       success: true,
-      data: data
+      data
     });
-
   } catch (error) {
     console.error('Proxy error:', error);
     res.status(500).json({

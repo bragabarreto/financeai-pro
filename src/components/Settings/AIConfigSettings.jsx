@@ -37,9 +37,9 @@ const AIConfigSettings = ({ user }) => {
       id: 'openai',
       name: 'OpenAI (ChatGPT)',
       models: [
-        { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini (Recomendado)' },
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-        { value: 'gpt-4o', label: 'GPT-4o' }
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Recomendado)' },
+        { value: 'gpt-4o', label: 'GPT-4o' },
+        { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini (Responses API)' }
       ],
       description: 'OpenAI GPT oferece alta qualidade e suporte a visão computacional',
       getKeyUrl: 'https://platform.openai.com/api-keys',
@@ -255,57 +255,83 @@ const AIConfigSettings = ({ user }) => {
   const testAPIKey = async () => {
     try {
       const testPrompt = 'Responda apenas com "OK"';
-      
+
       if (config.provider === 'openai') {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const model = config.model || 'gpt-4o-mini';
+        const useResponsesEndpoint = model.startsWith('gpt-4.1') || model.startsWith('o1');
+        const endpoint = useResponsesEndpoint
+          ? 'https://api.openai.com/v1/responses'
+          : 'https://api.openai.com/v1/chat/completions';
+        const payload = useResponsesEndpoint
+          ? {
+              model,
+              input: [
+                {
+                  role: 'user',
+                  content: [{ type: 'text', text: testPrompt }]
+                }
+              ],
+              max_output_tokens: 10,
+              temperature: 0.1,
+              modalities: ['text']
+            }
+          : {
+              model,
+              messages: [{ role: 'user', content: testPrompt }],
+              max_tokens: 10
+            };
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${config.apiKey}`
           },
-          body: JSON.stringify({
-            model: config.model || 'gpt-4.1-mini',
-            messages: [{ role: 'user', content: testPrompt }],
-            max_tokens: 10
-          })
+          body: JSON.stringify(payload)
         });
-        
+
         if (!response.ok) {
-          const error = await response.json();
-          return { success: false, error: error.error?.message || 'Chave API inválida' };
+          let errorMessage = 'Chave API inválida';
+          try {
+            const error = await response.json();
+            errorMessage = error.error?.message || error.message || error.error || errorMessage;
+          } catch (parseError) {
+            errorMessage = `${errorMessage}: ${response.statusText}`;
+          }
+          return { success: false, error: errorMessage };
         }
-        
       } else if (config.provider === 'gemini') {
         const model = config.model || 'gemini-2.5-flash';
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: testPrompt }] }]
-          })
-        });
-        
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: testPrompt }] }]
+            })
+          }
+        );
+
         if (!response.ok) {
           const error = await response.json();
           return { success: false, error: error.error?.message || 'Chave API inválida' };
         }
-        
       } else if (config.provider === 'claude') {
-        // Check proxy availability first
         if (proxyStatus.checked && !proxyStatus.available) {
           return {
             success: false,
-            error: 'Servidor proxy não está disponível. Por favor, inicie o servidor proxy com "npm run proxy" ou configure REACT_APP_ANTHROPIC_PROXY_URL para o endereço do seu servidor proxy em produção.'
+            error:
+              'Servidor proxy não está disponível. Por favor, inicie o servidor proxy com "npm run proxy" ou configure REACT_APP_ANTHROPIC_PROXY_URL para o endereço do seu servidor proxy em produção.'
           };
         }
 
-        // Use proxy server to avoid CORS issues with Anthropic API
         const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
-        
+
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+
           const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
@@ -319,37 +345,35 @@ const AIConfigSettings = ({ user }) => {
             }),
             signal: controller.signal
           });
-          
+
           clearTimeout(timeoutId);
-          
+
           if (!response.ok) {
             const result = await response.json();
             return { success: false, error: result.error || 'Erro ao conectar com o proxy' };
           }
-          
+
           const result = await response.json();
-          
+
           if (!result.success) {
             return { success: false, error: result.error || 'Chave API inválida' };
           }
         } catch (error) {
-          // Provide specific error messages based on error type
           if (error.name === 'AbortError') {
             return {
               success: false,
               error: 'Timeout ao conectar com o proxy. Verifique se o servidor está rodando.'
             };
           }
-          
-          return { 
-            success: false, 
+
+          return {
+            success: false,
             error: `Falha ao conectar com o servidor proxy em ${proxyUrl}. Certifique-se de que:\n1. O servidor proxy está rodando (execute "npm run proxy")\n2. A variável REACT_APP_ANTHROPIC_PROXY_URL está configurada corretamente\n3. Não há firewall bloqueando a conexão`
           };
         }
       }
-      
+
       return { success: true };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }

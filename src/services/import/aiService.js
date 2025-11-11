@@ -17,7 +17,7 @@ const AI_CONFIG = {
     enabled: !!process.env.REACT_APP_OPENAI_API_KEY,
     apiKey: process.env.REACT_APP_OPENAI_API_KEY,
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-4-turbo-preview'
+    model: 'gpt-4o-mini'
   },
   gemini: {
     enabled: !!process.env.REACT_APP_GEMINI_API_KEY,
@@ -61,34 +61,71 @@ export const getAvailableProviders = () => {
  * @returns {Promise<string>} AI response
  */
 const callOpenAI = async (prompt) => {
-  const response = await fetch(AI_CONFIG.openai.endpoint, {
+  const model = AI_CONFIG.openai.model;
+  const useResponsesEndpoint = model.startsWith('gpt-4.1') || model.startsWith('o1');
+  const endpoint = useResponsesEndpoint
+    ? 'https://api.openai.com/v1/responses'
+    : AI_CONFIG.openai.endpoint;
+
+  const payload = useResponsesEndpoint
+    ? {
+        model,
+        input: [
+          {
+            role: 'system',
+            content: [
+              { type: 'text', text: 'You are a financial transaction categorization assistant. Analyze transactions and provide categorization in JSON format.' }
+            ]
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt }
+            ]
+          }
+        ],
+        temperature: 0.3,
+        max_output_tokens: 500,
+        response_format: { type: 'json_object' }
+      }
+    : {
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a financial transaction categorization assistant. Analyze transactions and provide categorization in JSON format.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      };
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${AI_CONFIG.openai.apiKey}`
     },
-    body: JSON.stringify({
-      model: AI_CONFIG.openai.model,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a financial transaction categorization assistant. Analyze transactions and provide categorization in JSON format.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 500
-    })
+    body: JSON.stringify(payload)
   });
-
+  
   if (!response.ok) {
     throw new Error(`OpenAI API error: ${response.statusText}`);
   }
-
+  
   const data = await response.json();
+
+  if (useResponsesEndpoint) {
+    const outputPart = data.output?.[0]?.content?.find(
+      (part) => part.type === 'output_text' || part.type === 'text'
+    );
+    return outputPart?.text || '';
+  }
+
   return data.choices[0]?.message?.content || '';
 };
 

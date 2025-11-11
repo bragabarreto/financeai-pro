@@ -289,7 +289,7 @@ export const extractFromSMSWithAI = async (smsText, aiConfig, cards = [], availa
     let response;
     
     if (aiConfig.provider === 'openai' || aiConfig.provider === 'chatgpt') {
-      response = await callOpenAI(prompt, aiConfig.apiKey, aiConfig.model || 'gpt-4.1-mini');
+      response = await callOpenAI(prompt, aiConfig.apiKey, aiConfig.model || 'gpt-4o-mini');
     } else if (aiConfig.provider === 'gemini') {
       response = await callGemini(prompt, aiConfig.apiKey, aiConfig.model || 'gemini-2.5-flash');
     } else if (aiConfig.provider === 'claude') {
@@ -464,21 +464,49 @@ const extractFromSMSBasic = (smsText, cards = []) => {
  * Call OpenAI API
  */
 const callOpenAI = async (prompt, apiKey, model) => {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const useResponsesEndpoint = model.startsWith('gpt-4.1') || model.startsWith('o1');
+  const endpoint = useResponsesEndpoint
+    ? 'https://api.openai.com/v1/responses'
+    : 'https://api.openai.com/v1/chat/completions';
+  
+  const payload = useResponsesEndpoint
+    ? {
+        model,
+        input: [
+          {
+            role: 'system',
+            content: [
+              { type: 'text', text: 'Você é um assistente especializado em extrair dados estruturados de SMS bancários. Retorne APENAS JSON válido, sem texto adicional.' }
+            ]
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt }
+            ]
+          }
+        ],
+        max_output_tokens: 800,
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
+      }
+    : {
+        model,
+        messages: [
+          { role: 'system', content: 'Você é um assistente especializado em extrair dados estruturados de mensagens SMS bancárias. Retorne APENAS JSON válido, sem texto adicional.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.1,
+        max_tokens: 800
+      };
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: 'Você é um assistente especializado em extrair dados estruturados de mensagens SMS bancárias. Retorne APENAS JSON válido, sem texto adicional.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 800
-    })
+    body: JSON.stringify(payload)
   });
   
   if (!response.ok) {
@@ -486,6 +514,14 @@ const callOpenAI = async (prompt, apiKey, model) => {
   }
   
   const data = await response.json();
+  
+  if (useResponsesEndpoint) {
+    const outputPart = data.output?.[0]?.content?.find(
+      (part) => part.type === 'output_text' || part.type === 'text'
+    );
+    return outputPart?.text || '';
+  }
+  
   return data.choices[0].message.content;
 };
 
