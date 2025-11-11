@@ -18,7 +18,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test"
+    "test": "react-scripts test",
+    "proxy": "node server/anthropic-proxy.js"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

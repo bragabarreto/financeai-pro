@@ -19,7 +19,9 @@ A API da Anthropic bloqueia requisições CORS do navegador por questões de seg
 
 1. **Inicie o servidor proxy** (em um terminal separado):
    ```bash
-   node server/anthropic-proxy.js
+   npm run proxy
+   # ou diretamente:
+   # node server/anthropic-proxy.js
    ```
    O servidor irá rodar na porta 3001 por padrão.
 
