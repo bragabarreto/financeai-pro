@@ -1,5 +1,13 @@
 {
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "build",
-  "framework": "create-react-app"
+  "framework": "create-react-app",
+  "env": {
+    "REACT_APP_ANTHROPIC_PROXY_URL": "@anthropic-proxy-url"
+  },
+  "build": {
+    "env": {
+      "REACT_APP_ANTHROPIC_PROXY_URL": "@anthropic-proxy-url"
+    }
+  }
 }

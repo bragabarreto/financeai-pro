@@ -11,6 +11,7 @@ const AIConfigSettings = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showKeys, setShowKeys] = useState({});
+  const [proxyStatus, setProxyStatus] = useState({ checked: false, available: false });
   
   const [config, setConfig] = useState({
     enabled: false,
@@ -63,6 +64,40 @@ const AIConfigSettings = ({ user }) => {
       loadConfig();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Check proxy status when Claude provider is selected
+    if (config.provider === 'claude') {
+      checkProxyHealth();
+    }
+  }, [config.provider]);
+
+  const checkProxyHealth = async () => {
+    try {
+      const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001';
+      const healthUrl = `${proxyUrl.replace('/anthropic-proxy', '')}/health`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProxyStatus({ checked: true, available: data.status === 'ok' });
+      } else {
+        setProxyStatus({ checked: true, available: false });
+      }
+    } catch (error) {
+      console.warn('Proxy health check failed:', error.message);
+      setProxyStatus({ checked: true, available: false });
+    }
+  };
 
   const loadConfig = async () => {
     setLoading(true);
@@ -256,10 +291,21 @@ const AIConfigSettings = ({ user }) => {
         }
         
       } else if (config.provider === 'claude') {
+        // Check proxy availability first
+        if (proxyStatus.checked && !proxyStatus.available) {
+          return {
+            success: false,
+            error: 'Servidor proxy não está disponível. Por favor, inicie o servidor proxy com "npm run proxy" ou configure REACT_APP_ANTHROPIC_PROXY_URL para o endereço do seu servidor proxy em produção.'
+          };
+        }
+
         // Use proxy server to avoid CORS issues with Anthropic API
         const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
         
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          
           const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
@@ -270,8 +316,16 @@ const AIConfigSettings = ({ user }) => {
               model: config.model || 'claude-3-5-sonnet-20241022',
               prompt: testPrompt,
               maxTokens: 10
-            })
+            }),
+            signal: controller.signal
           });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            const result = await response.json();
+            return { success: false, error: result.error || 'Erro ao conectar com o proxy' };
+          }
           
           const result = await response.json();
           
@@ -279,10 +333,17 @@ const AIConfigSettings = ({ user }) => {
             return { success: false, error: result.error || 'Chave API inválida' };
           }
         } catch (error) {
-          // Fallback error message if proxy is not available
+          // Provide specific error messages based on error type
+          if (error.name === 'AbortError') {
+            return {
+              success: false,
+              error: 'Timeout ao conectar com o proxy. Verifique se o servidor está rodando.'
+            };
+          }
+          
           return { 
             success: false, 
-            error: 'Falha ao conectar com o servidor proxy. Certifique-se de que o servidor está rodando em http://localhost:3001' 
+            error: `Falha ao conectar com o servidor proxy em ${proxyUrl}. Certifique-se de que:\n1. O servidor proxy está rodando (execute "npm run proxy")\n2. A variável REACT_APP_ANTHROPIC_PROXY_URL está configurada corretamente\n3. Não há firewall bloqueando a conexão`
           };
         }
       }
@@ -370,6 +431,47 @@ const AIConfigSettings = ({ user }) => {
                 ))}
               </div>
             </div>
+
+            {/* Proxy Status Warning for Claude */}
+            {config.provider === 'claude' && proxyStatus.checked && !proxyStatus.available && (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-orange-900">
+                    <p className="font-medium mb-2">⚠️ Servidor Proxy Não Detectado</p>
+                    <p className="mb-2">O Anthropic Claude requer um servidor proxy local para funcionar. O proxy não foi detectado em {process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001'}.</p>
+                    <p className="font-medium mb-1">Para usar o Claude, você precisa:</p>
+                    <ol className="list-decimal list-inside space-y-1 ml-2">
+                      <li>Abrir um terminal separado</li>
+                      <li>Executar o comando: <code className="bg-orange-100 px-2 py-0.5 rounded">npm run proxy</code></li>
+                      <li>Manter o servidor rodando enquanto usa o aplicativo</li>
+                    </ol>
+                    <p className="mt-2 text-xs">
+                      Em produção, configure a variável de ambiente <code className="bg-orange-100 px-1 rounded">REACT_APP_ANTHROPIC_PROXY_URL</code> com o endereço do seu servidor proxy.
+                    </p>
+                    <button
+                      onClick={checkProxyHealth}
+                      className="mt-3 px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 transition-colors"
+                    >
+                      Verificar Novamente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Proxy Status Success for Claude */}
+            {config.provider === 'claude' && proxyStatus.checked && proxyStatus.available && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <div className="text-sm text-green-900">
+                    <p className="font-medium">✓ Servidor Proxy Conectado</p>
+                    <p className="text-xs mt-1">O servidor proxy está rodando e pronto para usar o Claude.</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Model Selection */}
             {currentProvider && (

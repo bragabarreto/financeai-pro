@@ -37,10 +37,20 @@ A API da Anthropic bloqueia requisições CORS do navegador por questões de seg
 
 ### Variáveis de Ambiente (Opcional)
 
-Se você quiser usar um proxy personalizado, configure:
+Se você quiser usar um proxy personalizado ou em produção, configure:
 ```bash
 REACT_APP_ANTHROPIC_PROXY_URL=http://seu-servidor:porta/anthropic-proxy
 ```
+
+**Para deployment em produção (Vercel, Netlify, etc.):**
+- Veja o guia completo: [PROXY_DEPLOYMENT_GUIDE.md](./PROXY_DEPLOYMENT_GUIDE.md)
+- Configure a variável de ambiente `REACT_APP_ANTHROPIC_PROXY_URL` no seu provedor de hosting
+- O proxy pode ser deployado como serverless function, worker ou servidor separado
+
+**Exemplo de configuração no Vercel:**
+1. Vá em Settings → Environment Variables
+2. Adicione `REACT_APP_ANTHROPIC_PROXY_URL` com o valor da URL do seu proxy
+3. O proxy pode ser deployado na própria Vercel como serverless function em `api/anthropic-proxy.js`
 
 ### Segurança
 
