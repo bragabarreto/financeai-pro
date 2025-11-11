@@ -5,7 +5,9 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
     "date-fns": "^3.0.0",
+    "express": "^5.1.0",
     "lucide-react": "^0.263.1",
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
@@ -16,7 +18,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test"
+    "test": "react-scripts test",
+    "proxy": "node server/anthropic-proxy.js"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
