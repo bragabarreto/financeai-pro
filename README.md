@@ -17,6 +17,19 @@ A API da Anthropic bloqueia requisições CORS do navegador por questões de seg
 
 ### Como configurar e usar Anthropic Claude
 
+#### Opção 1: Desenvolvimento Simplificado (Recomendado)
+
+Execute um único comando que inicia tanto o proxy quanto o frontend:
+```bash
+npm run dev
+```
+
+Este comando inicia automaticamente:
+- O servidor proxy na porta 3001
+- O frontend React na porta 3000
+
+#### Opção 2: Executar Separadamente
+
 1. **Inicie o servidor proxy** (em um terminal separado):
    ```bash
    npm run proxy
@@ -25,13 +38,20 @@ A API da Anthropic bloqueia requisições CORS do navegador por questões de seg
    ```
    O servidor irá rodar na porta 3001 por padrão.
 
-2. **Configure sua chave API no aplicativo**:
+2. **Inicie o frontend** (em outro terminal):
+   ```bash
+   npm start
+   ```
+
+#### Configuração da Chave API
+
+1. **Configure sua chave API no aplicativo**:
    - Acesse Configurações → IA
    - Selecione "Anthropic Claude" como provedor
    - Cole sua chave API (obtenha em https://console.anthropic.com/settings/keys)
    - Clique em "Salvar Configuração"
 
-3. **Use normalmente**:
+2. **Use normalmente**:
    - O sistema irá usar o proxy automaticamente para Claude
    - OpenAI e Gemini continuam funcionando sem proxy
 

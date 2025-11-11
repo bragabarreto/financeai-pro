@@ -136,6 +136,9 @@ const callClaude = async (prompt) => {
   const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
   
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: {
@@ -146,8 +149,11 @@ const callClaude = async (prompt) => {
         model: AI_CONFIG.anthropic.model,
         prompt: `You are a financial transaction categorization assistant. ${prompt}`,
         maxTokens: 500
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     const result = await response.json();
     
@@ -158,8 +164,11 @@ const callClaude = async (prompt) => {
     return result.data.content?.[0]?.text || '';
   } catch (error) {
     // Provide helpful error if proxy is not available
-    if (error.message.includes('fetch')) {
-      throw new Error('Não foi possível conectar ao servidor proxy para Anthropic. Certifique-se de que o servidor está rodando em http://localhost:3001');
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout ao conectar com o servidor proxy. Verifique se o servidor está rodando corretamente.');
+    }
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      throw new Error(`Não foi possível conectar ao servidor proxy em ${proxyUrl}. Execute "npm run dev" ou "npm run proxy" para iniciar o servidor.`);
     }
     throw error;
   }

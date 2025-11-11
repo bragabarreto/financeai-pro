@@ -7,7 +7,9 @@
  * 
  * Security: API keys are sent from the frontend but never stored on the server.
  * 
- * Usage: node server/anthropic-proxy.js
+ * Usage: 
+ *   Development: npm run dev (starts both proxy and frontend)
+ *   Proxy only: npm run proxy
  * Default port: 3001
  */
 
@@ -20,6 +22,13 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.path}`);
+  next();
+});
 
 /**
  * POST /anthropic-proxy
@@ -112,10 +121,24 @@ app.post('/anthropic-proxy', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Proxy error:', error);
-    res.status(500).json({
+    console.error('Proxy error:', error.message);
+    
+    // Provide more detailed error information
+    let errorMessage = error.message || 'Internal server error';
+    let statusCode = 500;
+    
+    // Handle specific error types
+    if (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND')) {
+      errorMessage = 'Failed to connect to Anthropic API. Please check your internet connection.';
+      statusCode = 503;
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'Request to Anthropic API timed out. Please try again.';
+      statusCode = 504;
+    }
+    
+    res.status(statusCode).json({
       success: false,
-      error: error.message || 'Internal server error'
+      error: errorMessage
     });
   }
 });
@@ -127,7 +150,23 @@ app.get('/health', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Anthropic proxy server running on port ${PORT}`);
-  console.log(`📡 Endpoint: http://localhost:${PORT}/anthropic-proxy`);
-  console.log(`💚 Health check: http://localhost:${PORT}/health`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🚀 Anthropic Proxy Server Started');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`📡 Proxy endpoint: http://localhost:${PORT}/anthropic-proxy`);
+  console.log(`💚 Health check:   http://localhost:${PORT}/health`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('✓ Ready to receive requests from frontend');
+  console.log('✓ CORS enabled for all origins');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+    console.error('   Please stop the other process or use a different port:\n');
+    console.error(`   PORT=3002 npm run proxy\n`);
+    process.exit(1);
+  } else {
+    console.error('\n❌ Failed to start proxy server:', err.message);
+    process.exit(1);
+  }
 });

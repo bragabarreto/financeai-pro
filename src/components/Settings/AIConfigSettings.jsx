@@ -78,7 +78,7 @@ const AIConfigSettings = ({ user }) => {
       const healthUrl = `${proxyUrl.replace('/anthropic-proxy', '')}/health`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for better reliability
       
       const response = await fetch(healthUrl, {
         method: 'GET',
@@ -291,20 +291,42 @@ const AIConfigSettings = ({ user }) => {
         }
         
       } else if (config.provider === 'claude') {
-        // Check proxy availability first
-        if (proxyStatus.checked && !proxyStatus.available) {
-          return {
-            success: false,
-            error: 'Servidor proxy não está disponível. Por favor, inicie o servidor proxy com "npm run proxy" ou configure REACT_APP_ANTHROPIC_PROXY_URL para o endereço do seu servidor proxy em produção.'
-          };
-        }
-
         // Use proxy server to avoid CORS issues with Anthropic API
         const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
         
         try {
+          // First, verify proxy health
+          const healthUrl = `${proxyUrl.replace('/anthropic-proxy', '')}/health`;
+          const healthController = new AbortController();
+          const healthTimeoutId = setTimeout(() => healthController.abort(), 3000);
+          
+          let proxyAvailable = false;
+          try {
+            const healthResponse = await fetch(healthUrl, {
+              method: 'GET',
+              signal: healthController.signal
+            });
+            clearTimeout(healthTimeoutId);
+            
+            if (healthResponse.ok) {
+              const healthData = await healthResponse.json();
+              proxyAvailable = healthData.status === 'ok';
+            }
+          } catch (healthError) {
+            clearTimeout(healthTimeoutId);
+            console.warn('Health check failed:', healthError);
+          }
+          
+          if (!proxyAvailable) {
+            return {
+              success: false,
+              error: 'Servidor proxy não está disponível. Por favor, inicie o servidor proxy com "npm run proxy" em um terminal separado ou configure REACT_APP_ANTHROPIC_PROXY_URL para o endereço do seu servidor proxy em produção.'
+            };
+          }
+          
+          // Now test the API key
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
           
           const response = await fetch(proxyUrl, {
             method: 'POST',
@@ -337,13 +359,21 @@ const AIConfigSettings = ({ user }) => {
           if (error.name === 'AbortError') {
             return {
               success: false,
-              error: 'Timeout ao conectar com o proxy. Verifique se o servidor está rodando.'
+              error: 'Timeout ao conectar com o proxy. Verifique se o servidor está rodando e respondendo corretamente.'
+            };
+          }
+          
+          // Check if it's a network error
+          if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            return {
+              success: false,
+              error: `Falha ao conectar com o servidor proxy. Certifique-se de que o servidor está rodando em ${proxyUrl}. Execute "npm run proxy" em um terminal separado.`
             };
           }
           
           return { 
             success: false, 
-            error: `Falha ao conectar com o servidor proxy em ${proxyUrl}. Certifique-se de que:\n1. O servidor proxy está rodando (execute "npm run proxy")\n2. A variável REACT_APP_ANTHROPIC_PROXY_URL está configurada corretamente\n3. Não há firewall bloqueando a conexão`
+            error: `Erro ao testar API: ${error.message || 'Erro desconhecido'}`
           };
         }
       }

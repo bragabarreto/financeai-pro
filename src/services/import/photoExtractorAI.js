@@ -489,6 +489,9 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
   const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
   
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for image processing
+    
     const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: {
@@ -500,8 +503,11 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
         prompt: prompt,
         maxTokens: 1500,
         image: base64Image
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     const result = await response.json();
     
@@ -512,8 +518,11 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
     return result.data.content[0].text;
   } catch (error) {
     // Provide helpful error if proxy is not available
-    if (error.message.includes('fetch')) {
-      throw new Error('Não foi possível conectar ao servidor proxy. Certifique-se de que o servidor está rodando em http://localhost:3001');
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout ao processar imagem. A imagem pode ser muito grande ou o servidor está sobrecarregado.');
+    }
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      throw new Error(`Não foi possível conectar ao servidor proxy em ${proxyUrl}. Execute "npm run dev" para iniciar o servidor.`);
     }
     throw error;
   }

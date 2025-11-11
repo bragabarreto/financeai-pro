@@ -19,12 +19,14 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "proxy": "node server/anthropic-proxy.js"
+    "proxy": "node server/anthropic-proxy.js",
+    "dev": "concurrently \"npm run proxy\" \"npm start\" --names \"proxy,app\" --prefix-colors \"cyan,green\""
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "concurrently": "^9.2.1",
     "react-scripts": "5.0.1"
   },
   "browserslist": {
