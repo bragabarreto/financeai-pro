@@ -256,23 +256,34 @@ const AIConfigSettings = ({ user }) => {
         }
         
       } else if (config.provider === 'claude') {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': config.apiKey,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: config.model || 'claude-3-5-sonnet-20241022',
-            max_tokens: 10,
-            messages: [{ role: 'user', content: testPrompt }]
-          })
-        });
+        // Use proxy server to avoid CORS issues with Anthropic API
+        const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
         
-        if (!response.ok) {
-          const error = await response.json();
-          return { success: false, error: error.error?.message || 'Chave API inválida' };
+        try {
+          const response = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              apiKey: config.apiKey,
+              model: config.model || 'claude-3-5-sonnet-20241022',
+              prompt: testPrompt,
+              maxTokens: 10
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (!result.success) {
+            return { success: false, error: result.error || 'Chave API inválida' };
+          }
+        } catch (error) {
+          // Fallback error message if proxy is not available
+          return { 
+            success: false, 
+            error: 'Falha ao conectar com o servidor proxy. Certifique-se de que o servidor está rodando em http://localhost:3001' 
+          };
         }
       }
       

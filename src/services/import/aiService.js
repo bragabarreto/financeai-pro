@@ -127,35 +127,42 @@ const callGemini = async (prompt) => {
 };
 
 /**
- * Call Anthropic Claude API
+ * Call Anthropic Claude API via proxy
  * @param {string} prompt - The prompt to send
  * @returns {Promise<string>} AI response
  */
 const callClaude = async (prompt) => {
-  const response = await fetch(AI_CONFIG.anthropic.endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': AI_CONFIG.anthropic.apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.anthropic.model,
-      max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: `You are a financial transaction categorization assistant. ${prompt}`
-      }],
-      temperature: 0.3
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Claude API error: ${response.statusText}`);
+  // Use proxy server to avoid CORS issues with Anthropic API
+  const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
+  
+  try {
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        apiKey: AI_CONFIG.anthropic.apiKey,
+        model: AI_CONFIG.anthropic.model,
+        prompt: `You are a financial transaction categorization assistant. ${prompt}`,
+        maxTokens: 500
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(`Claude API error: ${result.error || 'Unknown error'}`);
+    }
+    
+    return result.data.content?.[0]?.text || '';
+  } catch (error) {
+    // Provide helpful error if proxy is not available
+    if (error.message.includes('fetch')) {
+      throw new Error('Não foi possível conectar ao servidor proxy para Anthropic. Certifique-se de que o servidor está rodando em http://localhost:3001');
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  return data.content?.[0]?.text || '';
 };
 
 /**

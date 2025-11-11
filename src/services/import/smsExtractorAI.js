@@ -518,32 +518,40 @@ const callGemini = async (prompt, apiKey, model) => {
 };
 
 /**
- * Call Anthropic Claude API
+ * Call Anthropic Claude API via proxy
  */
 const callClaude = async (prompt, apiKey, model) => {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 800,
-      temperature: 0.1,
-      messages: [
-        { role: 'user', content: prompt }
-      ]
-    })
-  });
+  // Use proxy server to avoid CORS issues with Anthropic API
+  const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
   
-  if (!response.ok) {
-    throw new Error(`Claude API error: ${response.statusText}`);
+  try {
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        apiKey: apiKey,
+        model: model,
+        prompt: prompt,
+        maxTokens: 800
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(`Claude API error: ${result.error || 'Unknown error'}`);
+    }
+    
+    return result.data.content[0].text;
+  } catch (error) {
+    // Provide helpful error if proxy is not available
+    if (error.message.includes('fetch')) {
+      throw new Error('Não foi possível conectar ao servidor proxy. Certifique-se de que o servidor está rodando em http://localhost:3001');
+    }
+    throw error;
   }
-  
-  const data = await response.json();
-  return data.content[0].text;
 };
 
 /**
