@@ -5,6 +5,7 @@
  */
 
 import { getTodayLocalDate } from '../../utils/dateUtils';
+import { resolveAnthropicProxyBaseUrl, resolveAnthropicProxyUrl } from '../../utils/anthropicProxy';
 import { suggestCategoryFromHistory } from './patternLearning';
 
 /**
@@ -486,7 +487,8 @@ const callGeminiVision = async (prompt, base64Image, apiKey, model) => {
  */
 const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
   // Use proxy server to avoid CORS issues with Anthropic API
-  const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
+  const proxyUrl = resolveAnthropicProxyUrl();
+  const proxyBaseUrl = resolveAnthropicProxyBaseUrl();
   
   try {
     const response = await fetch(proxyUrl, {
@@ -512,8 +514,12 @@ const callClaudeVision = async (prompt, base64Image, apiKey, model) => {
     return result.data.content[0].text;
   } catch (error) {
     // Provide helpful error if proxy is not available
-    if (error.message.includes('fetch')) {
-      throw new Error('Não foi possível conectar ao servidor proxy. Certifique-se de que o servidor está rodando em http://localhost:3001');
+    if (
+      error.name === 'TypeError' ||
+      error.message.includes('fetch') ||
+      error.message.includes('Failed to fetch')
+    ) {
+      throw new Error(`Não foi possível conectar ao servidor proxy. Certifique-se de que o serviço está acessível em ${proxyBaseUrl || proxyUrl}`);
     }
     throw error;
   }

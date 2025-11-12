@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Save, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
+import { resolveAnthropicProxyBaseUrl, resolveAnthropicProxyHealthUrl, resolveAnthropicProxyUrl } from '../../utils/anthropicProxy';
 
 /**
  * AI Configuration Settings Component
@@ -72,32 +73,30 @@ const AIConfigSettings = ({ user }) => {
     }
   }, [config.provider]);
 
-  const checkProxyHealth = async () => {
-    try {
-      const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001';
-      const healthUrl = `${proxyUrl.replace('/anthropic-proxy', '')}/health`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-      
-      const response = await fetch(healthUrl, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setProxyStatus({ checked: true, available: data.status === 'ok' });
-      } else {
+    const checkProxyHealth = async () => {
+      try {
+        const healthUrl = resolveAnthropicProxyHealthUrl();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+        
+        const response = await fetch(healthUrl, {
+          method: 'GET',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setProxyStatus({ checked: true, available: data.status === 'ok' });
+        } else {
+          setProxyStatus({ checked: true, available: false });
+        }
+      } catch (error) {
+        console.warn('Proxy health check failed:', error.message);
         setProxyStatus({ checked: true, available: false });
       }
-    } catch (error) {
-      console.warn('Proxy health check failed:', error.message);
-      setProxyStatus({ checked: true, available: false });
-    }
-  };
+    };
 
   const loadConfig = async () => {
     setLoading(true);
@@ -326,7 +325,8 @@ const AIConfigSettings = ({ user }) => {
           };
         }
 
-        const proxyUrl = process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001/anthropic-proxy';
+        const proxyUrl = resolveAnthropicProxyUrl();
+        const proxyBaseUrl = resolveAnthropicProxyBaseUrl();
 
         try {
           const controller = new AbortController();
@@ -365,10 +365,9 @@ const AIConfigSettings = ({ user }) => {
               error: 'Timeout ao conectar com o proxy. Verifique se o servidor está rodando.'
             };
           }
-
           return {
             success: false,
-            error: `Falha ao conectar com o servidor proxy em ${proxyUrl}. Certifique-se de que:\n1. O servidor proxy está rodando (execute "npm run proxy")\n2. A variável REACT_APP_ANTHROPIC_PROXY_URL está configurada corretamente\n3. Não há firewall bloqueando a conexão`
+            error: `Falha ao conectar com o servidor proxy em ${proxyBaseUrl || proxyUrl}. Certifique-se de que:\n1. O servidor proxy está rodando (execute "npm run proxy")\n2. A variável REACT_APP_ANTHROPIC_PROXY_URL está configurada corretamente\n3. Não há firewall bloqueando a conexão`
           };
         }
       }
@@ -463,7 +462,7 @@ const AIConfigSettings = ({ user }) => {
                   <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-orange-900">
                     <p className="font-medium mb-2">⚠️ Servidor Proxy Não Detectado</p>
-                    <p className="mb-2">O Anthropic Claude requer um servidor proxy local para funcionar. O proxy não foi detectado em {process.env.REACT_APP_ANTHROPIC_PROXY_URL || 'http://localhost:3001'}.</p>
+                    <p className="mb-2">O Anthropic Claude requer um servidor proxy ativo para funcionar. Não foi possível acessar {resolveAnthropicProxyHealthUrl()}.</p>
                     <p className="font-medium mb-1">Para usar o Claude, você precisa:</p>
                     <ol className="list-decimal list-inside space-y-1 ml-2">
                       <li>Abrir um terminal separado</li>
@@ -471,7 +470,7 @@ const AIConfigSettings = ({ user }) => {
                       <li>Manter o servidor rodando enquanto usa o aplicativo</li>
                     </ol>
                     <p className="mt-2 text-xs">
-                      Em produção, configure a variável de ambiente <code className="bg-orange-100 px-1 rounded">REACT_APP_ANTHROPIC_PROXY_URL</code> com o endereço do seu servidor proxy.
+                      Em produção, configure a variável de ambiente <code className="bg-orange-100 px-1 rounded">REACT_APP_ANTHROPIC_PROXY_URL</code> com o endereço do seu servidor proxy (ex.: {resolveAnthropicProxyUrl()}).
                     </p>
                     <button
                       onClick={checkProxyHealth}
