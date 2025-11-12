@@ -42,105 +42,15 @@ Resposta esperada:
 
 ### Opção 1: Deploy do Proxy como Serverless Function (Recomendado para Vercel)
 
-1. Crie o diretório `api` na raiz do projeto
-2. Crie o arquivo `api/anthropic-proxy.js`:
+Este repositório já inclui as rotas serverless `api/anthropic-proxy.js` e `api/health.js`. Ao publicar no Vercel, elas ficam imediatamente disponíveis em:
 
-```javascript
-const cors = require('cors');
+- `https://seu-app.vercel.app/api/anthropic-proxy`
+- `https://seu-app.vercel.app/api/health`
 
-// Helper to initialize middleware
-const initMiddleware = (middleware) => (req, res) =>
-  new Promise((resolve, reject) => {
-    middleware(req, res, (result) =>
-      result instanceof Error ? reject(result) : resolve(result)
-    );
-  });
-
-const corsMiddleware = initMiddleware(cors());
-
-export default async function handler(req, res) {
-  await corsMiddleware(req, res);
-
-  if (req.method === 'GET' && req.url === '/health') {
-    return res.status(200).json({ status: 'ok', service: 'anthropic-proxy' });
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const { apiKey, model, prompt, maxTokens = 10, image } = req.body;
-
-    if (!apiKey || !model || !prompt) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields'
-      });
-    }
-
-    let messageContent;
-    if (image) {
-      messageContent = [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: 'image/jpeg',
-            data: image
-          }
-        },
-        {
-          type: 'text',
-          text: prompt
-        }
-      ];
-    } else {
-      messageContent = prompt;
-    }
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: maxTokens,
-        temperature: image ? 0.1 : undefined,
-        messages: [{ role: 'user', content: messageContent }]
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        success: false,
-        error: data.error?.message || 'Failed to call Anthropic API'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: data
-    });
-  } catch (error) {
-    console.error('Proxy error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error'
-    });
-  }
-}
-```
-
-3. Configure a variável de ambiente no Vercel:
-   - Acesse o dashboard do Vercel
-   - Vá em Settings → Environment Variables
-   - Adicione: `REACT_APP_ANTHROPIC_PROXY_URL` = `https://seu-dominio.vercel.app/api/anthropic-proxy`
+Passos:
+1. Execute `vercel deploy` (ou o fluxo da sua pipeline) normalmente.
+2. (Opcional) Configure a variável `REACT_APP_ANTHROPIC_PROXY_URL` caso precise apontar para outro proxy.
+3. Teste o endpoint de health: `curl https://seu-app.vercel.app/api/health`
 
 ### Opção 2: Deploy do Proxy em Servidor Separado (Render, Railway, etc.)
 

@@ -129,6 +129,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'anthropic-proxy' });
 });
 
+app.get('/anthropic-proxy/health', (req, res) => {
+  res.json({ status: 'ok', service: 'anthropic-proxy' });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Anthropic proxy server running on port ${PORT}`);
