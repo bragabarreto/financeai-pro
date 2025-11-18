@@ -8,7 +8,7 @@ import { supabase } from '../../supabaseClient';
 import { format, addMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
+const RecurringExpenseManager = ({ user, categories, accounts, cards, onTransactionsUpdated }) => {
   const [recurringExpenses, setRecurringExpenses] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [history, setHistory] = useState([]);
@@ -183,6 +183,11 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
     setLoading(true);
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
+    const dueDay = approvalData.expense.due_day || new Date().getDate();
+    const transactionDate = format(
+      new Date(currentYear, currentMonth - 1, dueDay),
+      'yyyy-MM-dd'
+    );
 
     try {
       // Registrar no histórico
@@ -213,7 +218,7 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
           category: approvalData.expense.category_id,
           account_id: approvalData.expense.account_id,
           card_id: approvalData.expense.card_id,
-          date: new Date(),
+          date: transactionDate,
           origin: 'recurring'
         }]);
 
@@ -230,6 +235,10 @@ const RecurringExpenseManager = ({ user, categories, accounts, cards }) => {
         checkPendingApprovals(),
         loadHistory()
       ]);
+
+      if (typeof onTransactionsUpdated === 'function') {
+        await onTransactionsUpdated();
+      }
 
       setShowApprovalModal(false);
       setApprovalData({ expense: null, newAmount: '', confirm: false });
