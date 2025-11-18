@@ -720,19 +720,19 @@ const loadCards = async () => {
               </button>
             </div>
 
-            <TransactionList
-              transactions={transactions}
-              categories={categories}
-              accounts={accounts}
-              cards={cards}
-              onEdit={(transaction) => {
-                setEditingTransaction(transaction);
-                setShowTransactionModal(true);
-              }}
-              onDelete={handleDeleteTransaction}
-              type="expense"
-              title="Transações de Gastos (Últimos 30 Dias)"
-            />
+              <TransactionList
+                transactions={transactions}
+                categories={categories}
+                accounts={accounts}
+                cards={cards}
+                onEdit={(transaction) => {
+                  setEditingTransaction(transaction);
+                  setShowTransactionModal(true);
+                }}
+                onDelete={handleDeleteTransaction}
+                type="expense"
+                title="Transações de Gastos"
+              />
 
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Categorias de Gastos</h2>
@@ -792,14 +792,15 @@ const loadCards = async () => {
         )}
 
         {/* Recurring Expenses Tab */}
-        {activeTab === 'recurring' && (
-          <RecurringExpenseManager 
-          user={user}
-          categories={categories}
-          accounts={accounts}
-          cards={cards} // Se você tiver cartões carregados
-  />
-)}
+          {activeTab === 'recurring' && (
+            <RecurringExpenseManager 
+              user={user}
+              categories={categories}
+              accounts={accounts}
+              cards={cards}
+              onTransactionsUpdated={loadTransactions}
+            />
+          )}
 
         {/* Income Tab */}
         {activeTab === 'income' && (
@@ -818,19 +819,19 @@ const loadCards = async () => {
               </button>
             </div>
 
-            <TransactionList
-              transactions={transactions}
-              categories={categories}
-              accounts={accounts}
-              cards={cards}
-              onEdit={(transaction) => {
-                setEditingTransaction(transaction);
-                setShowTransactionModal(true);
-              }}
-              onDelete={handleDeleteTransaction}
-              type="income"
-              title="Transações de Receitas (Últimos 30 Dias)"
-            />
+              <TransactionList
+                transactions={transactions}
+                categories={categories}
+                accounts={accounts}
+                cards={cards}
+                onEdit={(transaction) => {
+                  setEditingTransaction(transaction);
+                  setShowTransactionModal(true);
+                }}
+                onDelete={handleDeleteTransaction}
+                type="income"
+                title="Transações de Receitas"
+              />
 
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Categorias de Receitas</h2>
@@ -915,19 +916,19 @@ const loadCards = async () => {
               </div>
             </div>
 
-            <TransactionList
-              transactions={transactions}
-              categories={categories}
-              accounts={accounts}
-              cards={cards}
-              onEdit={(transaction) => {
-                setEditingTransaction(transaction);
-                setShowTransactionModal(true);
-              }}
-              onDelete={handleDeleteTransaction}
-              type="investment"
-              title="Transações de Investimentos (Últimos 30 Dias)"
-            />
+              <TransactionList
+                transactions={transactions}
+                categories={categories}
+                accounts={accounts}
+                cards={cards}
+                onEdit={(transaction) => {
+                  setEditingTransaction(transaction);
+                  setShowTransactionModal(true);
+                }}
+                onDelete={handleDeleteTransaction}
+                type="investment"
+                title="Transações de Investimentos"
+              />
 
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Categorias de Investimentos</h2>

@@ -1,31 +1,48 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Edit, Trash2, CreditCard, Building, Calendar, Tag, DollarSign } from 'lucide-react';
 import { parseLocalDate, formatBrazilianDate } from '../../utils/dateUtils';
 
-const TransactionList = ({ 
-  transactions, 
-  categories, 
-  accounts, 
+const TransactionList = ({
+  transactions,
+  categories,
+  accounts,
   cards,
-  onEdit, 
+  onEdit,
   onDelete,
   type,
-  title 
+  title
 }) => {
-  // Filter transactions from last 30 days
-  const getLast30DaysTransactions = () => {
+  const [activeTab, setActiveTab] = useState('recent'); // 'recent' | 'future'
+
+  const recentTransactions = useMemo(() => {
+    const now = new Date();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     return transactions
       .filter(t => {
         const transDate = parseLocalDate(t.date);
-        return t.type === type && transDate >= thirtyDaysAgo;
+        return (
+          t.type === type &&
+          transDate >= thirtyDaysAgo &&
+          transDate <= now
+        );
       })
       .sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
-  };
+  }, [transactions, type]);
 
-  const filteredTransactions = getLast30DaysTransactions();
+  const futureTransactions = useMemo(() => {
+    const now = new Date();
+
+    return transactions
+      .filter(t => {
+        const transDate = parseLocalDate(t.date);
+        return t.type === type && transDate > now;
+      })
+      .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+  }, [transactions, type]);
+
+  const filteredTransactions = activeTab === 'recent' ? recentTransactions : futureTransactions;
 
   const getCategoryName = (categoryId) => {
     const allCategories = [...categories.expense, ...categories.income, ...categories.investment];
@@ -45,13 +62,13 @@ const TransactionList = ({
 
   const getPaymentMethodLabel = (method) => {
     const methods = {
-      'credit_card': 'Cartão de Crédito',
-      'debit_card': 'Cartão de Débito',
-      'pix': 'PIX',
-      'transfer': 'Transferência',
-      'boleto': 'Boleto',
-      'cash': 'Dinheiro',
-      'other': 'Outro'
+      credit_card: 'Cartão de Crédito',
+      debit_card: 'Cartão de Débito',
+      pix: 'PIX',
+      transfer: 'Transferência',
+      boleto: 'Boleto',
+      cash: 'Dinheiro',
+      other: 'Outro'
     };
     return methods[method] || method || '-';
   };
@@ -60,23 +77,43 @@ const TransactionList = ({
     return formatBrazilianDate(dateString);
   };
 
-  if (filteredTransactions.length === 0) {
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-        <p className="text-gray-500">Nenhuma transação nos últimos 30 dias</p>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="p-6 border-b">
-        <h3 className="text-xl font-bold">{title}</h3>
-        <p className="text-sm text-gray-500 mt-1">
-          {filteredTransactions.length} transação(ões) nos últimos 30 dias
-        </p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-xl font-bold">{title}</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {activeTab === 'recent'
+                ? `${filteredTransactions.length} transação(ões) nos últimos 30 dias`
+                : `${filteredTransactions.length} lançamento(s) futuros registrados`}
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setActiveTab('recent')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                activeTab === 'recent'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Últimos 30 dias ({recentTransactions.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('future')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                activeTab === 'future'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Lançamentos futuros ({futureTransactions.length})
+            </button>
+          </div>
+        </div>
       </div>
-      
+
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
@@ -94,89 +131,99 @@ const TransactionList = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredTransactions.map((transaction) => (
-              <tr key={transaction.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span>{formatDate(transaction.date)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <div className="max-w-xs truncate" title={transaction.description}>
-                    {transaction.description}
-                  </div>
-                  {transaction.origin && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Origem: {transaction.origin}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium">
-                      R$ {transaction.amount.toFixed(2)}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Tag className="w-4 h-4 text-gray-400" />
-                    <span>{getCategoryName(transaction.category)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {getPaymentMethodLabel(transaction.payment_method)}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {transaction.payment_method === 'credit_card' ? (
-                    <div className="flex items-center space-x-2">
-                      <CreditCard className="w-4 h-4 text-gray-400" />
-                      <span>{getCardName(transaction.card_id)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <Building className="w-4 h-4 text-gray-400" />
-                      <span>{getAccountName(transaction.account_id)}</span>
-                    </div>
-                  )}
-                </td>
-                {type === 'expense' && (
-                  <td className="px-4 py-3 text-sm text-center">
-                    {transaction.is_alimony ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                        Sim
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                )}
-                <td className="px-4 py-3 text-sm text-right">
-                  <div className="flex items-center justify-end space-x-2">
-                    <button
-                      onClick={() => onEdit(transaction)}
-                      className="p-1 hover:bg-gray-200 rounded"
-                      title="Editar"
-                    >
-                      <Edit className="w-4 h-4 text-gray-600" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(transaction.id)}
-                      className="p-1 hover:bg-red-100 rounded"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </button>
-                  </div>
+            {filteredTransactions.length === 0 ? (
+              <tr>
+                <td colSpan={type === 'expense' ? 8 : 7} className="px-4 py-6 text-center text-sm text-gray-500">
+                  {activeTab === 'recent'
+                    ? 'Nenhuma transação registrada nos últimos 30 dias.'
+                    : 'Nenhum lançamento futuro cadastrado para este tipo.'}
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredTransactions.map((transaction) => (
+                <tr key={transaction.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <span>{formatDate(transaction.date)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="max-w-xs truncate" title={transaction.description}>
+                      {transaction.description}
+                    </div>
+                    {transaction.origin && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Origem: {transaction.origin}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="w-4 h-4 text-gray-400" />
+                      <span className="font-medium">
+                        R$ {transaction.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Tag className="w-4 h-4 text-gray-400" />
+                      <span>{getCategoryName(transaction.category)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {getPaymentMethodLabel(transaction.payment_method)}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {transaction.payment_method === 'credit_card' ? (
+                      <div className="flex items-center space-x-2">
+                        <CreditCard className="w-4 h-4 text-gray-400" />
+                        <span>{getCardName(transaction.card_id)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <Building className="w-4 h-4 text-gray-400" />
+                        <span>{getAccountName(transaction.account_id)}</span>
+                      </div>
+                    )}
+                  </td>
+                  {type === 'expense' && (
+                    <td className="px-4 py-3 text-sm text-center">
+                      {transaction.is_alimony ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                          Sim
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                  )}
+                  <td className="px-4 py-3 text-sm text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => onEdit(transaction)}
+                        className="p-1 hover:bg-gray-200 rounded"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4 text-gray-600" />
+                      </button>
+                      <button
+                        onClick={() => onDelete(transaction.id)}
+                        className="p-1 hover:bg-red-100 rounded"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
-      
+
       <div className="p-4 bg-gray-50 border-t">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-600">
