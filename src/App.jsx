@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import { parseLocalDate } from './utils/dateUtils';
 import { 
   Plus, TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, 
   Wallet, Target, AlertCircle, Brain, CreditCard, Building, Settings, RefreshCw,
@@ -354,7 +355,8 @@ const handleSaveAccount = async (accountData) => {
         
         // Criar array de transações (uma para cada parcela)
         const installmentTransactions = [];
-        const startDate = new Date(dateToSave);
+        // Use parseLocalDate for accurate date parsing without timezone issues
+        const startDate = parseLocalDate(dateToSave);
         
         for (let i = 0; i < installmentCount; i++) {
           const installmentDate = new Date(startDate);
@@ -379,8 +381,7 @@ const handleSaveAccount = async (accountData) => {
             is_alimony: transactionData.is_alimony || false,
             is_installment: true,
             installment_count: installmentCount,
-            installment_due_dates: null, // Não precisamos mais deste campo
-            last_installment_date: null   // Não precisamos mais deste campo
+            installment_number: i + 1 // Track which installment number this is (1-based)
           });
         }
         
