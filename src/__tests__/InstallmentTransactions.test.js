@@ -9,7 +9,7 @@
  * 5. Future transactions are correctly identified
  */
 
-import { parseLocalDate, formatDateLocal } from '../utils/dateUtils';
+import { parseLocalDate } from '../utils/dateUtils';
 
 describe('Installment Transaction Creation Logic', () => {
   // Helper function to simulate the installment creation logic from App.jsx
