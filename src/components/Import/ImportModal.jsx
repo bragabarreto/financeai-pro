@@ -1672,9 +1672,16 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                                 className="w-16 p-1 border rounded text-xs"
                                 placeholder="12"
                               />
-                              {transaction.installment_count > 0 && transaction.last_installment_date && (
-                                <div className="text-[10px] text-gray-600">
-                                  até {formatBrazilianDate(transaction.last_installment_date)}
+                              {transaction.installment_count > 0 && (
+                                <div className="text-[10px] space-y-0.5">
+                                  <div className="text-green-600 font-medium">
+                                    R$ {(transaction.amount / transaction.installment_count).toFixed(2)}/mês
+                                  </div>
+                                  {transaction.last_installment_date && (
+                                    <div className="text-gray-600">
+                                      até {formatBrazilianDate(transaction.last_installment_date)}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>

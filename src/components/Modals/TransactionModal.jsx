@@ -378,10 +378,20 @@ const TransactionModal = ({ show, onClose, onSave, transaction, categories, acco
                   />
                 </div>
                 {formData.installment_count > 0 && formData.last_installment_date && (
-                  <div className="text-xs text-blue-700 bg-blue-100 p-2 rounded">
-                    <p><strong>Data da primeira parcela:</strong> {formatBrazilianDate(formData.date)}</p>
-                    <p><strong>Data da última parcela:</strong> {formatBrazilianDate(formData.last_installment_date)}</p>
-                    <p><strong>Total de parcelas:</strong> {formData.installment_count}x de R$ {(formData.amount / formData.installment_count).toFixed(2)}</p>
+                  <div className="text-xs text-blue-700 bg-blue-100 p-3 rounded space-y-2">
+                    <div className="font-semibold text-blue-800 border-b border-blue-200 pb-1 mb-2">
+                      📋 Resumo do Parcelamento
+                    </div>
+                    <p><strong>Valor total:</strong> R$ {formData.amount.toFixed(2)}</p>
+                    <p className="text-green-700 font-medium">
+                      <strong>Valor de cada parcela:</strong> R$ {(formData.amount / formData.installment_count).toFixed(2)}
+                    </p>
+                    <p><strong>Quantidade:</strong> {formData.installment_count} parcelas</p>
+                    <p><strong>Primeira parcela:</strong> {formatBrazilianDate(formData.date)}</p>
+                    <p><strong>Última parcela:</strong> {formatBrazilianDate(formData.last_installment_date)}</p>
+                    <div className="mt-2 pt-2 border-t border-blue-200 text-blue-600">
+                      ℹ️ Serão criadas {formData.installment_count} transações separadas, cada uma com o valor de R$ {(formData.amount / formData.installment_count).toFixed(2)} e data de vencimento mensal.
+                    </div>
                   </div>
                 )}
               </div>
