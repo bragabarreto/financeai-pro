@@ -251,22 +251,37 @@ const callAI = async (prompt, preferredProvider = 'gemini') => {
  * @param {Array} availableCategories - List of available categories
  * @param {Array} availableCards - List of user's cards
  * @param {Array} availableAccounts - List of user's accounts
+ * @param {Object} historicalContext - Optional historical context for better matching
  * @returns {Promise<Object>} Enhanced transaction with AI suggestions
  */
-export const enhanceTransactionWithAI = async (transaction, availableCategories = [], availableCards = [], availableAccounts = []) => {
+export const enhanceTransactionWithAI = async (transaction, availableCategories = [], availableCards = [], availableAccounts = [], historicalContext = {}) => {
   if (!isAIAvailable()) {
     return transaction; // Return unchanged if no AI available
   }
 
   try {
     const categoryNames = availableCategories.map(c => c.name).join(', ');
-    const cardNames = availableCards.map(c => c.name).join(', ');
+    const cardNames = availableCards.map(c => `${c.name}${c.last_digits ? ` (*${c.last_digits})` : ''}`).join(', ');
     const accountNames = availableAccounts.map(a => a.name).join(', ');
     
     // If no categories are registered, return transaction unchanged
     if (!categoryNames) {
       console.warn('No categories available for AI enhancement');
       return transaction;
+    }
+    
+    // Build historical context section if available
+    let historicalSection = '';
+    if (historicalContext.recentTransactions && historicalContext.recentTransactions.length > 0) {
+      historicalSection = `
+HISTORICAL CONTEXT (USE AS PRIORITY REFERENCE):
+These transactions show how the user typically categorizes similar merchants:
+${historicalContext.recentTransactions.slice(0, 10).map(t => 
+  `- "${t.description}" → Category: ${t.category} (${t.type})`
+).join('\n')}
+
+IMPORTANT: If the current transaction description is SIMILAR to any in the history, 
+use the SAME CATEGORY to ensure consistency.`;
     }
     
     const prompt = `Analyze this financial transaction and suggest the best category and payment form:
@@ -276,20 +291,24 @@ Transaction Details:
 - Amount: R$ ${transaction.amount || 0}
 - Type: ${transaction.type || 'expense'}
 - Payment Method: ${transaction.payment_method || 'N/A'}
+- Card Last Digits: ${transaction.card_last_digits || 'N/A'}
 - Raw Text: ${transaction.raw_text || 'N/A'}
 
 Available Categories: ${categoryNames}
 Available Cards: ${cardNames || 'None'}
 Available Accounts: ${accountNames || 'None'}
+${historicalSection}
 
 IMPORTANT INSTRUCTIONS:
 1. You MUST select the category ONLY from the Available Categories list above. Do not suggest categories that are not in this list.
 2. Analyze the COMPLETE DESCRIPTION provided to understand the nature of the transaction and suggest the most appropriate category.
 3. The description field contains the full name of the establishment or party involved - use this complete information for accurate categorization.
+4. If historical context is provided and a similar transaction exists, PREFER the same category used before.
+5. If card last digits are provided, match them to the Available Cards list.
 
 Based on the payment method and COMPLETE description, identify:
 1. The most suitable category from the Available Categories list (use the full description as primary context)
-2. If payment_method is "credit_card", which card was likely used (match card name from description if possible)
+2. If payment_method is "credit_card", which card was likely used (match by last digits if provided, or by card name from description)
 3. If payment_method is "debit_card", "pix", "transfer", etc., which account was likely used
 
 Provide your response in JSON format:
@@ -355,11 +374,42 @@ Provide your response in JSON format:
  * @param {Array} availableCategories - List of available categories
  * @param {Array} availableCards - List of user's cards
  * @param {Array} availableAccounts - List of user's accounts
+ * @param {string} userId - Optional user ID for fetching historical context
  * @returns {Promise<Array>} Enhanced transactions
  */
-export const enhanceTransactionsWithAI = async (transactions, availableCategories = [], availableCards = [], availableAccounts = []) => {
+export const enhanceTransactionsWithAI = async (transactions, availableCategories = [], availableCards = [], availableAccounts = [], userId = null) => {
   if (!isAIAvailable() || !Array.isArray(transactions) || transactions.length === 0) {
     return transactions;
+  }
+
+  // Fetch historical context if userId is provided
+  let historicalContext = {};
+  if (userId) {
+    try {
+      const { supabase } = await import('../../supabaseClient');
+      const { data: recentTransactions } = await supabase
+        .from('transactions')
+        .select('description, category, type')
+        .eq('user_id', userId)
+        .not('category', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (recentTransactions && recentTransactions.length > 0) {
+        // Map category IDs to names
+        const transactionsWithNames = recentTransactions.map(t => {
+          const cat = availableCategories.find(c => c.id === t.category);
+          return {
+            ...t,
+            category: cat ? cat.name : 'outros'
+          };
+        });
+        historicalContext.recentTransactions = transactionsWithNames;
+        console.log(`📊 Contexto histórico carregado: ${transactionsWithNames.length} transações recentes`);
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar contexto histórico:', error);
+    }
   }
 
   // Process in batches to avoid rate limits
@@ -368,7 +418,7 @@ export const enhanceTransactionsWithAI = async (transactions, availableCategorie
   
   for (let i = 0; i < transactions.length; i += batchSize) {
     const batch = transactions.slice(i, i + batchSize);
-    const promises = batch.map(t => enhanceTransactionWithAI(t, availableCategories, availableCards, availableAccounts));
+    const promises = batch.map(t => enhanceTransactionWithAI(t, availableCategories, availableCards, availableAccounts, historicalContext));
     
     try {
       const results = await Promise.allSettled(promises);
