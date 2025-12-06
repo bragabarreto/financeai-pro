@@ -193,7 +193,28 @@ export const processImportFile = async (file, options = {}) => {
 };
 
 /**
+ * Helper function to calculate installment dates
+ * @param {String} startDate - Start date in YYYY-MM-DD format
+ * @param {Number} count - Number of installments
+ * @returns {Array} Array of dates in YYYY-MM-DD format
+ */
+const calculateInstallmentDates = (startDate, count) => {
+  const dates = [];
+  const date = new Date(startDate + 'T12:00:00'); // Add time to avoid timezone issues
+  for (let i = 0; i < count; i++) {
+    const installmentDate = new Date(date);
+    installmentDate.setMonth(date.getMonth() + i);
+    const year = installmentDate.getFullYear();
+    const month = String(installmentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(installmentDate.getDate()).padStart(2, '0');
+    dates.push(`${year}-${month}-${day}`);
+  }
+  return dates;
+};
+
+/**
  * Import transactions to database - FIXED VERSION
+ * Handles installment transactions by creating individual records for each installment
  * @param {Array} transactions - Transactions to import
  * @param {String} userId - User ID
  * @param {String} accountId - Account ID
@@ -221,7 +242,7 @@ export const importTransactions = async (transactions, userId, accountId, catego
       const cardId = transaction.card_id || null;
       
       // Ensure amount is a valid number
-      const amount = typeof transaction.amount === 'number' 
+      const totalAmount = typeof transaction.amount === 'number' 
         ? transaction.amount 
         : parseBrazilianCurrency(transaction.amount);
       
@@ -249,44 +270,102 @@ export const importTransactions = async (transactions, userId, accountId, catego
         throw new Error('Data inválida');
       }
       
-      if (amount === 0 || isNaN(amount)) {
+      if (totalAmount === 0 || isNaN(totalAmount)) {
         throw new Error('Valor inválido');
       }
       
-      const transactionData = {
-        user_id: userId,
-        account_id: finalAccountId,
-        card_id: cardId,
-        type: transaction.type || 'expense',
-        description: transaction.description,
-        amount: amount,
-        category: categoryId,
-        date: date,
-        payment_method: transaction.payment_method || null,
-        is_alimony: transaction.is_alimony || false,
-        origin: transaction.origin || null,
-        created_at: new Date().toISOString(),
-        is_installment: transaction.is_installment || false,
-        installment_count: transaction.installment_count || null,
-        installment_due_dates: transaction.installment_due_dates || null,
-        last_installment_date: transaction.last_installment_date || null
-      };
+      // Check if it's an installment transaction
+      const isInstallment = transaction.is_installment && transaction.installment_count > 1;
       
-      // Insert into database
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert([transactionData])
-        .select();
-      
-      if (error) {
-        throw error;
+      if (isInstallment) {
+        // Create multiple individual transactions for each installment
+        const installmentCount = parseInt(transaction.installment_count);
+        const installmentAmount = totalAmount / installmentCount;
+        const installmentDates = calculateInstallmentDates(date, installmentCount);
+        
+        const installmentTransactions = [];
+        
+        for (let i = 0; i < installmentCount; i++) {
+          installmentTransactions.push({
+            user_id: userId,
+            account_id: finalAccountId,
+            card_id: cardId,
+            type: transaction.type || 'expense',
+            description: `${transaction.description} (${i + 1}/${installmentCount})`,
+            amount: installmentAmount,
+            category: categoryId,
+            date: installmentDates[i],
+            payment_method: transaction.payment_method || null,
+            is_alimony: transaction.is_alimony || false,
+            origin: transaction.origin || 'import',
+            created_at: new Date().toISOString(),
+            is_installment: true,
+            installment_count: installmentCount,
+            installment_due_dates: null,
+            last_installment_date: null
+          });
+        }
+        
+        // Insert all installments at once
+        const { data, error } = await supabase
+          .from('transactions')
+          .insert(installmentTransactions)
+          .select();
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Add all installments as imported
+        data.forEach((installedTx, idx) => {
+          importedTransactions.push({
+            ...transaction,
+            id: installedTx.id,
+            description: `${transaction.description} (${idx + 1}/${installmentCount})`,
+            amount: installmentAmount,
+            date: installmentDates[idx],
+            success: true
+          });
+        });
+        
+        console.log(`✅ ${installmentCount} parcelas criadas para: ${transaction.description}`);
+      } else {
+        // Single transaction (no installments)
+        const transactionData = {
+          user_id: userId,
+          account_id: finalAccountId,
+          card_id: cardId,
+          type: transaction.type || 'expense',
+          description: transaction.description,
+          amount: totalAmount,
+          category: categoryId,
+          date: date,
+          payment_method: transaction.payment_method || null,
+          is_alimony: transaction.is_alimony || false,
+          origin: transaction.origin || 'import',
+          created_at: new Date().toISOString(),
+          is_installment: false,
+          installment_count: null,
+          installment_due_dates: null,
+          last_installment_date: null
+        };
+        
+        // Insert into database
+        const { data, error } = await supabase
+          .from('transactions')
+          .insert([transactionData])
+          .select();
+        
+        if (error) {
+          throw error;
+        }
+        
+        importedTransactions.push({
+          ...transaction,
+          id: data[0].id,
+          success: true
+        });
       }
-      
-      importedTransactions.push({
-        ...transaction,
-        id: data[0].id,
-        success: true
-      });
     } catch (error) {
       failedTransactions.push({
         ...transaction,

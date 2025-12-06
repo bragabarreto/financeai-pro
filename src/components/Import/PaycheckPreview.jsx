@@ -249,9 +249,16 @@ const PaycheckPreview = ({
                     className="w-24 px-2 py-1 border rounded text-sm"
                     placeholder="12"
                   />
-                  {currentData.installment_count > 0 && currentData.last_installment_date && (
-                    <div className="text-xs text-blue-800">
-                      até {formatBrazilianDate(currentData.last_installment_date)}
+                  {currentData.installment_count > 0 && (
+                    <div className="text-xs space-y-1 mt-1">
+                      <div className="text-green-700 font-medium">
+                        R$ {(currentData.amount / currentData.installment_count).toFixed(2)}/mês
+                      </div>
+                      {currentData.last_installment_date && (
+                        <div className="text-blue-800">
+                          até {formatBrazilianDate(currentData.last_installment_date)}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
