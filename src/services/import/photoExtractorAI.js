@@ -90,10 +90,14 @@ const buildEnhancedVisionPrompt = (cardDigitsList, categoryNames, historicalCont
   
   let contextSection = '';
   if (historicalContext.recentTransactions && historicalContext.recentTransactions.length > 0) {
-    contextSection = `\n\nCONTEXTO HISTÓRICO DO USUÁRIO (use para melhorar precisão de categorização):
+    contextSection = `\n\nCONTEXTO HISTÓRICO DO USUÁRIO (USE COMO REFERÊNCIA PRIORITÁRIA PARA CATEGORIZAÇÃO):
+As transações abaixo mostram como o usuário categoriza estabelecimentos similares:
 ${historicalContext.recentTransactions.slice(0, 10).map(t => 
   `- "${t.description}" → ${t.category} (${t.type})`
-).join('\n')}`;
+).join('\n')}
+
+IMPORTANTE: Se a descrição da transação atual for SIMILAR a alguma do histórico, 
+use a MESMA CATEGORIA. Isso garante consistência nas finanças do usuário.`;
   }
   
   return `Você é um assistente especializado em OCR e extração de dados de comprovantes, recibos e notificações bancárias brasileiras.

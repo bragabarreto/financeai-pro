@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Upload, FileText, AlertCircle, CheckCircle, 
   Loader, Download, Eye, Edit2, Trash2, Save,
-  AlertTriangle, MessageSquare, Sparkles, DollarSign
+  AlertTriangle, MessageSquare, Sparkles, DollarSign,
+  History, CreditCard
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
 import { formatDateLocal, formatBrazilianDate } from '../../utils/dateUtils';
@@ -11,6 +12,7 @@ import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus, getAIConfig } fr
 import { extractFromPhoto } from '../../services/import/photoExtractorAI';
 import { extractFromPaycheck } from '../../services/import/paycheckExtractorAI';
 import { useAIConfig, checkAIAvailability } from '../../hooks/useAIConfig';
+import { enrichTransactionsWithHistory, matchCardByDigits } from '../../services/import/transactionMatcher';
 import PaycheckPreview from './PaycheckPreview';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
@@ -136,23 +138,49 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           .concat(Object.values(categories.income || []))
           .concat(Object.values(categories.investment || []));
         
-        transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts);
+        transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts, user?.id);
+      }
+
+      // Build flat category list for enrichment
+      const allCategories = Object.values(categories.expense || [])
+        .concat(Object.values(categories.income || []))
+        .concat(Object.values(categories.investment || []));
+
+      // Enrich transactions with historical data and card matching
+      let enrichedTransactions = transactions;
+      if (user && user.id) {
+        console.log('🔍 Enriquecendo transações com histórico do usuário...');
+        enrichedTransactions = await enrichTransactionsWithHistory(
+          transactions,
+          user.id,
+          cards,
+          accounts,
+          allCategories
+        );
       }
 
       // Map categories with pattern learning
-      const transactionsWithCategoryMapping = await Promise.all(transactions.map(async (t) => {
+      const transactionsWithCategoryMapping = await Promise.all(enrichedTransactions.map(async (t) => {
         const categoryList = Object.values(categories[t.type] || []);
         
-        // Try AI suggestion first
+        // Check if category was already set by enrichment
         let matchedCategory = null;
-        let suggestionSource = null;
+        let suggestionSource = t.suggestionSource || null;
         
-        if (t.aiSuggestedCategory) {
+        if (t.categoryId) {
+          matchedCategory = categoryList.find(c => c.id === t.categoryId);
+          if (matchedCategory && !suggestionSource) {
+            suggestionSource = 'history';
+          }
+        }
+        
+        // Try AI suggestion if no category yet
+        if (!matchedCategory && t.aiSuggestedCategory) {
           matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
           suggestionSource = 'ai';
         }
         
-        // If no AI suggestion, try pattern learning from history
+        // If no category yet, try pattern learning from history
         if (!matchedCategory && user && user.id) {
           const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
           const historyMatch = await suggestCategoryFromHistory(user.id, t.description);
@@ -164,34 +192,46 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         }
         
         // Auto-assign account or card based on payment method with intelligent fallback
-        let defaultAccountId = null;
-        let defaultCardId = null;
+        // Prefer values already set by enrichment (from historical match or card digit match)
+        let defaultAccountId = t.account_id || null;
+        let defaultCardId = t.card_id || null;
         let needsReview = false;
+        let cardMatchedByDigits = t.cardMatchedByDigits || false;
         
         if (t.payment_method === 'credit_card') {
           // Tentar atribuir cartão se for crédito
-          if (t.card_id) {
-            defaultCardId = t.card_id;
-          } else if (cards.length > 0) {
-            defaultCardId = cards[0].id;
-          } else {
-            // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
-            defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
-            needsReview = true; // Marcar como necessitando revisão
+          if (!defaultCardId) {
+            // Try to match by card digits if available
+            if (t.card_last_digits && cards.length > 0) {
+              const cardMatch = matchCardByDigits(t.card_last_digits, cards);
+              if (cardMatch) {
+                defaultCardId = cardMatch.card.id;
+                cardMatchedByDigits = true;
+                console.log(`💳 SMS: Cartão ${cardMatch.card.name} identificado pelos dígitos ${t.card_last_digits}`);
+              }
+            }
+            // Fallback to first card
+            if (!defaultCardId && cards.length > 0) {
+              defaultCardId = cards[0].id;
+            } else if (!defaultCardId) {
+              // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
+              defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
+              needsReview = true;
+            }
           }
         } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
                    t.payment_method === 'transfer' || t.payment_method === 'application' || 
                    t.payment_method === 'redemption') {
-          // Tentar atribuir conta para outros métodos
-          if (t.account_id) {
-            defaultAccountId = t.account_id;
-          } else if (accounts.length > 0) {
-            // Preferir conta principal se existir
-            const primaryAcc = accounts.find(a => a.is_primary);
-            defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
-          } else {
-            // Sem contas disponíveis - marcar como erro
-            needsReview = true;
+          // Tentar atribuir conta para outros métodos (se não já definida por enrichment)
+          if (!defaultAccountId) {
+            if (accounts.length > 0) {
+              // Preferir conta principal se existir
+              const primaryAcc = accounts.find(a => a.is_primary);
+              defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
+            } else {
+              // Sem contas disponíveis - marcar como erro
+              needsReview = true;
+            }
           }
         }
         
@@ -205,6 +245,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           manuallyEdited: false,
           account_id: defaultAccountId,
           card_id: defaultCardId,
+          cardMatchedByDigits: cardMatchedByDigits,
           needsReview: needsReview, // Marcar transações que precisam de revisão manual
           // Ensure installment fields exist in preview
           is_installment: t.is_installment || false,
@@ -213,6 +254,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           last_installment_date: t.last_installment_date || null
         };
       }));
+
+      // Log enrichment summary
+      const historyMatches = transactionsWithCategoryMapping.filter(t => t.suggestionSource === 'history').length;
+      const cardDigitMatches = transactionsWithCategoryMapping.filter(t => t.cardMatchedByDigits).length;
+      console.log(`✅ Processamento SMS concluído: ${historyMatches} categorias do histórico, ${cardDigitMatches} cartões identificados por dígitos`);
 
       setProcessResult({
         transactions: transactionsWithCategoryMapping,
@@ -223,7 +269,9 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           totalRows: transactions.length,
           extractedTransactions: transactions.length,
           validTransactions: validation.validTransactions,
-          aiEnhanced: useAI && isAIAvailable()
+          aiEnhanced: useAI && isAIAvailable(),
+          historyMatches: historyMatches,
+          cardDigitMatches: cardDigitMatches
         }
       });
       
@@ -301,23 +349,50 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
       // Use AI enhancement if available and enabled
       if (useAI && isAIAvailable()) {
-        transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts);
+        transactions = await enhanceTransactionsWithAI(transactions, categoryList, cards, accounts, user?.id);
+      }
+
+      // Enrich transactions with historical data and card matching
+      let enrichedTransactions = transactions;
+      if (user && user.id) {
+        console.log('🔍 Enriquecendo transação de foto com histórico do usuário...');
+        
+        // Build flat category list for enrichment
+        const allCategories = Object.values(categories.expense || [])
+          .concat(Object.values(categories.income || []))
+          .concat(Object.values(categories.investment || []));
+          
+        enrichedTransactions = await enrichTransactionsWithHistory(
+          transactions,
+          user.id,
+          cards,
+          accounts,
+          allCategories
+        );
       }
 
       // Map categories with pattern learning
-      const transactionsWithCategoryMapping = await Promise.all(transactions.map(async (t) => {
+      const transactionsWithCategoryMapping = await Promise.all(enrichedTransactions.map(async (t) => {
         const categoryList = Object.values(categories[t.type] || []);
         
-        // Try AI suggestion first
+        // Check if category was already set by enrichment
         let matchedCategory = null;
-        let suggestionSource = null;
+        let suggestionSource = t.suggestionSource || null;
         
-        if (t.aiSuggestedCategory) {
+        if (t.categoryId) {
+          matchedCategory = categoryList.find(c => c.id === t.categoryId);
+          if (matchedCategory && !suggestionSource) {
+            suggestionSource = 'history';
+          }
+        }
+        
+        // Try AI suggestion if no category yet
+        if (!matchedCategory && t.aiSuggestedCategory) {
           matchedCategory = categoryList.find(c => c.id === t.aiSuggestedCategory);
           suggestionSource = 'ai';
         }
         
-        // If no AI suggestion, try pattern learning from history
+        // If no category yet, try pattern learning from history
         if (!matchedCategory && user && user.id) {
           const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
           const historyMatch = await suggestCategoryFromHistory(user.id, t.description);
@@ -329,34 +404,46 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         }
         
         // Auto-assign account or card based on payment method with intelligent fallback
-        let defaultAccountId = null;
-        let defaultCardId = null;
+        // Prefer values already set by enrichment (from historical match or card digit match)
+        let defaultAccountId = t.account_id || null;
+        let defaultCardId = t.card_id || null;
         let needsReview = false;
+        let cardMatchedByDigits = t.cardMatchedByDigits || false;
         
         if (t.payment_method === 'credit_card') {
           // Tentar atribuir cartão se for crédito
-          if (t.card_id) {
-            defaultCardId = t.card_id;
-          } else if (cards.length > 0) {
-            defaultCardId = cards[0].id;
-          } else {
-            // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
-            defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
-            needsReview = true; // Marcar como necessitando revisão
+          if (!defaultCardId) {
+            // Try to match by card digits if available
+            if (t.card_last_digits && cards.length > 0) {
+              const cardMatch = matchCardByDigits(t.card_last_digits, cards);
+              if (cardMatch) {
+                defaultCardId = cardMatch.card.id;
+                cardMatchedByDigits = true;
+                console.log(`💳 Foto: Cartão ${cardMatch.card.name} identificado pelos dígitos ${t.card_last_digits}`);
+              }
+            }
+            // Fallback to first card
+            if (!defaultCardId && cards.length > 0) {
+              defaultCardId = cards[0].id;
+            } else if (!defaultCardId) {
+              // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
+              defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
+              needsReview = true;
+            }
           }
         } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
                    t.payment_method === 'transfer' || t.payment_method === 'application' || 
                    t.payment_method === 'redemption') {
-          // Tentar atribuir conta para outros métodos
-          if (t.account_id) {
-            defaultAccountId = t.account_id;
-          } else if (accounts.length > 0) {
-            // Preferir conta principal se existir
-            const primaryAcc = accounts.find(a => a.is_primary);
-            defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
-          } else {
-            // Sem contas disponíveis - marcar como erro
-            needsReview = true;
+          // Tentar atribuir conta para outros métodos (se não já definida por enrichment)
+          if (!defaultAccountId) {
+            if (accounts.length > 0) {
+              // Preferir conta principal se existir
+              const primaryAcc = accounts.find(a => a.is_primary);
+              defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
+            } else {
+              // Sem contas disponíveis - marcar como erro
+              needsReview = true;
+            }
           }
         }
         
@@ -370,6 +457,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           manuallyEdited: false,
           account_id: defaultAccountId,
           card_id: defaultCardId,
+          cardMatchedByDigits: cardMatchedByDigits,
           needsReview: needsReview, // Marcar transações que precisam de revisão manual
           // Ensure installment fields exist in preview
           is_installment: t.is_installment || false,
@@ -378,6 +466,11 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           last_installment_date: t.last_installment_date || null
         };
       }));
+
+      // Log enrichment summary
+      const historyMatches = transactionsWithCategoryMapping.filter(t => t.suggestionSource === 'history').length;
+      const cardDigitMatches = transactionsWithCategoryMapping.filter(t => t.cardMatchedByDigits).length;
+      console.log(`✅ Processamento Foto concluído: ${historyMatches} categorias do histórico, ${cardDigitMatches} cartões identificados por dígitos`);
 
       const validation = {
         valid: true,
@@ -394,7 +487,9 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           totalRows: 1,
           extractedTransactions: 1,
           validTransactions: 1,
-          aiEnhanced: useAI && isAIAvailable()
+          aiEnhanced: useAI && isAIAvailable(),
+          historyMatches: historyMatches,
+          cardDigitMatches: cardDigitMatches
         }
       });
       
@@ -549,44 +644,17 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       
       setProcessResult(result);
       
+      // Build flat category list for enrichment
+      const allCategories = Object.values(categories.expense || [])
+        .concat(Object.values(categories.income || []))
+        .concat(Object.values(categories.investment || []));
+      
       // Map category names to IDs and mark auto-categorized items as suggestions
       let transactionsWithCategoryMapping = result.transactions.map(t => {
         const categoryList = Object.values(categories[t.type] || []);
         const matchedCategory = categoryList.find(c => 
           c.name.toLowerCase() === (t.category || '').toLowerCase()
         );
-        
-        // Auto-assign account or card based on payment method with intelligent fallback
-        let defaultAccountId = null;
-        let defaultCardId = null;
-        let needsReview = false;
-        
-        if (t.payment_method === 'credit_card') {
-          // Tentar atribuir cartão se for crédito
-          if (t.card_id) {
-            defaultCardId = t.card_id;
-          } else if (cards.length > 0) {
-            defaultCardId = cards[0].id;
-          } else {
-            // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
-            defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
-            needsReview = true; // Marcar como necessitando revisão
-          }
-        } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
-                   t.payment_method === 'transfer' || t.payment_method === 'application' || 
-                   t.payment_method === 'redemption') {
-          // Tentar atribuir conta para outros métodos
-          if (t.account_id) {
-            defaultAccountId = t.account_id;
-          } else if (accounts.length > 0) {
-            // Preferir conta principal se existir
-            const primaryAcc = accounts.find(a => a.is_primary);
-            defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
-          } else {
-            // Sem contas disponíveis - marcar como erro
-            needsReview = true;
-          }
-        }
         
         return {
           ...t,
@@ -596,10 +664,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           isSuggestion: matchedCategory ? true : false, // Mark as suggestion if auto-categorized
           manuallyEdited: false,
           selected: true,
-          account_id: defaultAccountId,
-          card_id: defaultCardId,
           is_alimony: false,
-          needsReview: needsReview, // Marcar transações que precisam de revisão manual
           // Ensure installment fields exist in preview
           is_installment: t.is_installment || false,
           installment_count: t.installment_count || null,
@@ -610,15 +675,12 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
       // Use AI enhancement if available and enabled
       if (useAI && isAIAvailable()) {
-        const categoryList = Object.values(categories.expense || [])
-          .concat(Object.values(categories.income || []))
-          .concat(Object.values(categories.investment || []));
-        
         transactionsWithCategoryMapping = await enhanceTransactionsWithAI(
           transactionsWithCategoryMapping, 
-          categoryList,
+          allCategories,
           cards,
-          accounts
+          accounts,
+          user?.id
         );
 
         // Normalize AI suggestions to match existing categories exactly
@@ -629,10 +691,7 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
           // Prefer type-specific list; if not found, fallback to any list
           let matched = typeCategories.find(c => c.id === t.aiSuggestedCategory);
           if (!matched) {
-            const allCats = Object.values(categories.expense || [])
-              .concat(Object.values(categories.income || []))
-              .concat(Object.values(categories.investment || []));
-            matched = allCats.find(c => c.id === t.aiSuggestedCategory);
+            matched = allCategories.find(c => c.id === t.aiSuggestedCategory);
           }
           if (matched) {
             return {
@@ -648,37 +707,101 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         });
       }
       
-      // Apply pattern learning to transactions without AI suggestions
+      // Enrich transactions with historical data and card matching
       if (user && user.id) {
-        const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
-        
-        transactionsWithCategoryMapping = await Promise.all(
-          transactionsWithCategoryMapping.map(async (t) => {
-            // Skip if already has a category from AI or file
-            if (t.categoryId) {
-              return t;
-            }
-            
-            // Try pattern learning
-            const categoryList = Object.values(categories[t.type] || []);
+        console.log('🔍 Enriquecendo transações de arquivo com histórico do usuário...');
+        transactionsWithCategoryMapping = await enrichTransactionsWithHistory(
+          transactionsWithCategoryMapping,
+          user.id,
+          cards,
+          accounts,
+          allCategories
+        );
+      }
+      
+      // Final processing: apply account/card assignments and pattern learning
+      transactionsWithCategoryMapping = await Promise.all(
+        transactionsWithCategoryMapping.map(async (t) => {
+          const categoryList = Object.values(categories[t.type] || []);
+          
+          // Try pattern learning if no category yet
+          let matchedCategory = t.categoryId ? categoryList.find(c => c.id === t.categoryId) : null;
+          let suggestionSource = t.suggestionSource || null;
+          
+          if (!matchedCategory && user && user.id) {
+            const { suggestCategoryFromHistory } = await import('../../services/import/patternLearning');
             const historyMatch = await suggestCategoryFromHistory(user.id, t.description);
             
             if (historyMatch && historyMatch.confidence > 0.5) {
-              const matchedCategory = categoryList.find(c => c.id === historyMatch.categoryId);
+              matchedCategory = categoryList.find(c => c.id === historyMatch.categoryId);
               if (matchedCategory) {
-                return {
-                  ...t,
-                  categoryId: matchedCategory.id,
-                  isSuggestion: true,
-                  suggestionSource: 'history'
-                };
+                suggestionSource = 'history';
               }
             }
-            
-            return t;
-          })
-        );
-      }
+          }
+          
+          // Auto-assign account or card based on payment method with intelligent fallback
+          // Prefer values already set by enrichment (from historical match or card digit match)
+          let defaultAccountId = t.account_id || null;
+          let defaultCardId = t.card_id || null;
+          let needsReview = false;
+          let cardMatchedByDigits = t.cardMatchedByDigits || false;
+          
+          if (t.payment_method === 'credit_card') {
+            // Tentar atribuir cartão se for crédito
+            if (!defaultCardId) {
+              // Try to match by card digits if available
+              if (t.card_last_digits && cards.length > 0) {
+                const cardMatch = matchCardByDigits(t.card_last_digits, cards);
+                if (cardMatch) {
+                  defaultCardId = cardMatch.card.id;
+                  cardMatchedByDigits = true;
+                  console.log(`💳 Arquivo: Cartão ${cardMatch.card.name} identificado pelos dígitos ${t.card_last_digits}`);
+                }
+              }
+              // Fallback to first card
+              if (!defaultCardId && cards.length > 0) {
+                defaultCardId = cards[0].id;
+              } else if (!defaultCardId) {
+                // Fallback: se não tem cartão, tentar conta (usuário pode ajustar depois)
+                defaultAccountId = accounts.length > 0 ? accounts[0].id : null;
+                needsReview = true;
+              }
+            }
+          } else if (t.payment_method === 'debit_card' || t.payment_method === 'pix' || 
+                     t.payment_method === 'transfer' || t.payment_method === 'application' || 
+                     t.payment_method === 'redemption') {
+            // Tentar atribuir conta para outros métodos (se não já definida por enrichment)
+            if (!defaultAccountId) {
+              if (accounts.length > 0) {
+                // Preferir conta principal se existir
+                const primaryAcc = accounts.find(a => a.is_primary);
+                defaultAccountId = primaryAcc ? primaryAcc.id : accounts[0].id;
+              } else {
+                // Sem contas disponíveis - marcar como erro
+                needsReview = true;
+              }
+            }
+          }
+          
+          return {
+            ...t,
+            categoryId: matchedCategory?.id || t.categoryId || null,
+            category: matchedCategory?.name || t.category || null,
+            isSuggestion: !!(matchedCategory || t.isSuggestion),
+            suggestionSource: suggestionSource || t.suggestionSource,
+            account_id: defaultAccountId,
+            card_id: defaultCardId,
+            cardMatchedByDigits: cardMatchedByDigits,
+            needsReview: needsReview
+          };
+        })
+      );
+      
+      // Log enrichment summary
+      const historyMatches = transactionsWithCategoryMapping.filter(t => t.suggestionSource === 'history').length;
+      const cardDigitMatches = transactionsWithCategoryMapping.filter(t => t.cardMatchedByDigits).length;
+      console.log(`✅ Processamento Arquivo concluído: ${historyMatches} categorias do histórico, ${cardDigitMatches} cartões identificados por dígitos`);
       
       setEditingTransactions(transactionsWithCategoryMapping);
       setStep(2);
@@ -1373,18 +1496,37 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                     <p className="text-sm text-blue-700 mt-1">
                       A IA extraiu os <strong>nomes completos</strong> dos estabelecimentos/envolvidos nas transações.
                       As categorias foram automaticamente classificadas usando essas descrições completas para maior precisão. 
-                      Campos com <span className="bg-yellow-100 px-1 rounded">fundo amarelo</span> são sugestões automáticas. 
+                      Campos com <span className="bg-yellow-100 px-1 rounded">fundo amarelo</span> são sugestões da IA.
+                      Campos com <span className="bg-purple-100 px-1 rounded">fundo roxo</span> são baseados no seu histórico de transações.
                       Você pode editar qualquer categoria antes de confirmar a importação.
-                      Após editar, o campo perderá o destaque amarelo.
                     </p>
                     <p className="text-sm text-blue-700 mt-2">
-                      ✓ Transações com cartão de crédito foram vinculadas automaticamente aos cartões cadastrados.<br/>
-                      ✓ Transações com débito, PIX ou transferência foram vinculadas às contas bancárias.<br/>
+                      <span className="flex items-center gap-1"><CreditCard className="w-4 h-4 inline" /> Cartões identificados pelos últimos 4 dígitos têm indicador <span className="text-green-600">verde</span>.</span>
+                      ✓ Transações similares ao seu histórico foram pré-preenchidas automaticamente.<br/>
                       ✓ Verifique se a vinculação está correta na coluna "Forma de Pagamento".
                     </p>
                   </div>
                 </div>
               </div>
+
+              {/* Summary of automatic matches */}
+              {processResult.metadata && (processResult.metadata.historyMatches > 0 || processResult.metadata.cardDigitMatches > 0) && (
+                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center text-sm text-green-800">
+                    <History className="w-4 h-4 mr-2" />
+                    <span>
+                      <strong>Preenchimento Inteligente:</strong>{' '}
+                      {processResult.metadata.historyMatches > 0 && (
+                        <span>{processResult.metadata.historyMatches} categoria(s) do histórico</span>
+                      )}
+                      {processResult.metadata.historyMatches > 0 && processResult.metadata.cardDigitMatches > 0 && ' • '}
+                      {processResult.metadata.cardDigitMatches > 0 && (
+                        <span>{processResult.metadata.cardDigitMatches} cartão(ões) identificado(s) pelos dígitos</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4 flex justify-between items-center">
                 <div className="flex space-x-3">
@@ -1536,20 +1678,35 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                           </select>
                         </td>
                         <td className="p-2">
-                          <select
-                            value={transaction.categoryId || ''}
-                            onChange={(e) => handleTransactionEdit(index, 'categoryId', e.target.value)}
-                            className={`w-full p-1 border rounded text-xs ${
-                              transaction.isSuggestion && !transaction.manuallyEdited ? 'bg-yellow-50 border-yellow-300' : 'bg-white'
-                            }`}
-                          >
-                            <option value="">Selecione...</option>
-                            {Object.values(categories[transaction.type] || []).map(cat => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <select
+                              value={transaction.categoryId || ''}
+                              onChange={(e) => handleTransactionEdit(index, 'categoryId', e.target.value)}
+                              className={`w-full p-1 border rounded text-xs ${
+                                transaction.isSuggestion && !transaction.manuallyEdited 
+                                  ? (transaction.suggestionSource === 'history' 
+                                      ? 'bg-purple-50 border-purple-300' 
+                                      : 'bg-yellow-50 border-yellow-300')
+                                  : 'bg-white'
+                              }`}
+                              title={transaction.suggestionSource === 'history' 
+                                ? 'Categoria sugerida com base no seu histórico de transações'
+                                : transaction.suggestionSource === 'ai'
+                                  ? 'Categoria sugerida pela IA'
+                                  : ''
+                              }
+                            >
+                              <option value="">Selecione...</option>
+                              {Object.values(categories[transaction.type] || []).map(cat => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </select>
+                            {transaction.suggestionSource === 'history' && !transaction.manuallyEdited && (
+                              <History className="absolute right-6 top-1/2 -translate-y-1/2 w-3 h-3 text-purple-500" title="Do histórico" />
+                            )}
+                          </div>
                         </td>
                         <td className="p-2">
                           <select
@@ -1585,18 +1742,36 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                         </td>
                         <td className="p-2">
                           {transaction.payment_method === 'credit_card' ? (
-                            <select
-                              value={transaction.card_id || ''}
-                              onChange={(e) => handleTransactionEdit(index, 'card_id', e.target.value)}
-                              className="w-full p-1 border rounded text-xs"
-                            >
-                              <option value="">Selecione cartão...</option>
-                              {cards.map(card => (
-                                <option key={card.id} value={card.id}>
-                                  {card.name}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="relative">
+                              <select
+                                value={transaction.card_id || ''}
+                                onChange={(e) => handleTransactionEdit(index, 'card_id', e.target.value)}
+                                className={`w-full p-1 border rounded text-xs ${
+                                  transaction.cardMatchedByDigits 
+                                    ? 'bg-green-50 border-green-300' 
+                                    : ''
+                                }`}
+                                title={transaction.cardMatchedByDigits 
+                                  ? `Cartão identificado pelos últimos 4 dígitos: ${transaction.card_last_digits}`
+                                  : ''
+                                }
+                              >
+                                <option value="">Selecione cartão...</option>
+                                {cards.map(card => (
+                                  <option key={card.id} value={card.id}>
+                                    {card.name} {card.last_digits ? `(*${card.last_digits})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              {transaction.cardMatchedByDigits && (
+                                <CreditCard className="absolute right-6 top-1/2 -translate-y-1/2 w-3 h-3 text-green-500" title={`Identificado pelos dígitos ${transaction.card_last_digits}`} />
+                              )}
+                              {transaction.card_last_digits && (
+                                <span className="block text-[10px] text-gray-500 mt-0.5">
+                                  Dígitos: {transaction.card_last_digits}
+                                </span>
+                              )}
+                            </div>
                           ) : (transaction.payment_method === 'debit_card' || transaction.payment_method === 'pix' || transaction.payment_method === 'transfer' || transaction.payment_method === 'bank_account' || transaction.payment_method === 'application' || transaction.payment_method === 'redemption') ? (
                             <select
                               value={transaction.account_id || ''}

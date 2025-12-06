@@ -94,10 +94,14 @@ const buildEnhancedPrompt = (smsText, cardDigitsList, categoryNames, historicalC
   
   let contextSection = '';
   if (historicalContext.recentTransactions && historicalContext.recentTransactions.length > 0) {
-    contextSection = `\n\nCONTEXTO HISTÓRICO DO USUÁRIO (use para melhorar precisão):
+    contextSection = `\n\nCONTEXTO HISTÓRICO DO USUÁRIO (USE COMO REFERÊNCIA PRIORITÁRIA PARA CATEGORIZAÇÃO):
+As transações abaixo mostram como o usuário categoriza estabelecimentos similares:
 ${historicalContext.recentTransactions.map(t => 
   `- "${t.description}" → Categoria: ${t.category} (${t.type})`
-).join('\n')}`;
+).join('\n')}
+
+IMPORTANTE: Se a descrição da transação atual for SIMILAR a alguma do histórico, 
+use a MESMA CATEGORIA. Isso garante consistência nas finanças do usuário.`;
   }
   
   return `Você é um assistente especializado em extrair dados de transações financeiras de mensagens SMS bancárias brasileiras.
