@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Edit, Trash2, CreditCard, Building, Calendar, Tag, DollarSign } from 'lucide-react';
+import { Edit, Trash2, CreditCard, Building, Calendar, Tag, DollarSign, Repeat } from 'lucide-react';
 import { parseLocalDate, formatBrazilianDate } from '../../utils/dateUtils';
 
 const TransactionList = ({
@@ -149,8 +149,16 @@ const TransactionList = ({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    <div className="max-w-xs truncate" title={transaction.description}>
-                      {transaction.description}
+                    <div className="flex items-center space-x-2">
+                      <div className="max-w-xs truncate" title={transaction.description}>
+                        {transaction.description}
+                      </div>
+                      {transaction.is_installment && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800" title={`Parcela ${transaction.installment_number || '?'} de ${transaction.installment_count || '?'}`}>
+                          <Repeat className="w-3 h-3 mr-1" />
+                          Parcela
+                        </span>
+                      )}
                     </div>
                     {transaction.origin && (
                       <div className="text-xs text-gray-500 mt-1">
