@@ -23,7 +23,9 @@
     "proxy": "node server/anthropic-proxy.js",
     "migrate:installments": "node migrations/run-migration.js",
     "migrate:installments:execute": "node migrations/run-migration.js --execute",
-    "migrate:installments:test": "node migrations/test-migration-logic.js"
+    "migrate:installments:test": "node migrations/test-migration-logic.js",
+    "migrate:installments:comprehensive": "node migrations/fix-existing-installments-comprehensive.js",
+    "migrate:installments:comprehensive:execute": "node migrations/fix-existing-installments-comprehensive.js --execute"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

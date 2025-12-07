@@ -358,6 +358,14 @@ const handleSaveAccount = async (accountData) => {
         // Use parseLocalDate for accurate date parsing without timezone issues
         const startDate = parseLocalDate(dateToSave);
         
+        // Calculate the last installment date
+        const lastInstallmentDate = new Date(startDate);
+        lastInstallmentDate.setMonth(startDate.getMonth() + installmentCount - 1);
+        const lastYear = lastInstallmentDate.getFullYear();
+        const lastMonth = String(lastInstallmentDate.getMonth() + 1).padStart(2, '0');
+        const lastDay = String(lastInstallmentDate.getDate()).padStart(2, '0');
+        const formattedLastDate = `${lastYear}-${lastMonth}-${lastDay}`;
+        
         for (let i = 0; i < installmentCount; i++) {
           const installmentDate = new Date(startDate);
           installmentDate.setMonth(startDate.getMonth() + i);
@@ -372,6 +380,7 @@ const handleSaveAccount = async (accountData) => {
             type: transactionData.type,
             description: `${transactionData.description} (${i + 1}/${installmentCount})`,
             amount: installmentAmount,
+            total_amount: totalAmount,
             category: transactionData.category,
             account_id: transactionData.account_id || null,
             card_id: transactionData.card_id || null,
@@ -381,7 +390,8 @@ const handleSaveAccount = async (accountData) => {
             is_alimony: transactionData.is_alimony || false,
             is_installment: true,
             installment_count: installmentCount,
-            installment_number: i + 1 // Track which installment number this is (1-based)
+            installment_number: i + 1, // Track which installment number this is (1-based)
+            last_installment_date: formattedLastDate
           });
         }
         

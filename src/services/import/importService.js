@@ -282,6 +282,7 @@ export const importTransactions = async (transactions, userId, accountId, catego
         const installmentCount = parseInt(transaction.installment_count);
         const installmentAmount = totalAmount / installmentCount;
         const installmentDates = calculateInstallmentDates(date, installmentCount);
+        const lastInstallmentDate = installmentDates[installmentDates.length - 1];
         
         const installmentTransactions = [];
         
@@ -293,6 +294,7 @@ export const importTransactions = async (transactions, userId, accountId, catego
             type: transaction.type || 'expense',
             description: `${transaction.description} (${i + 1}/${installmentCount})`,
             amount: installmentAmount,
+            total_amount: totalAmount,
             category: categoryId,
             date: installmentDates[i],
             payment_method: transaction.payment_method || null,
@@ -301,8 +303,9 @@ export const importTransactions = async (transactions, userId, accountId, catego
             created_at: new Date().toISOString(),
             is_installment: true,
             installment_count: installmentCount,
+            installment_number: i + 1,
             installment_due_dates: null,
-            last_installment_date: null
+            last_installment_date: lastInstallmentDate
           });
         }
         
