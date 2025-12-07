@@ -16,8 +16,10 @@
  * - Descriptions without installment notation
  */
 
-const { createClient } = require('@supabase/supabase-js');
+// Load environment variables first
 require('dotenv').config();
+
+const { createClient } = require('@supabase/supabase-js');
 
 // Parse local date helper (avoid timezone issues)
 const parseLocalDate = (dateString) => {
@@ -106,7 +108,7 @@ const identifyProblematicInstallments = async (userId = null) => {
     const expectedCount = firstTx.installment_count;
     
     // Sort by date to check if they're in order
-    transactions.sort((a, b) => a.date.localeCompare(b.date));
+    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
     
     const problems = [];
     
@@ -206,7 +208,7 @@ const fixInstallmentGroup = async (group, dryRun = true) => {
   console.log(`   Problems: ${group.problems.join(', ')}`);
   
   // Sort by date
-  transactions.sort((a, b) => a.date.localeCompare(b.date));
+  transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
   
   const installmentCount = transactions.length;
   const installmentAmount = totalAmount / installmentCount;
