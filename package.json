@@ -20,7 +20,10 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "proxy": "node server/anthropic-proxy.js"
+    "proxy": "node server/anthropic-proxy.js",
+    "migrate:installments": "node migrations/run-migration.js",
+    "migrate:installments:execute": "node migrations/run-migration.js --execute",
+    "migrate:installments:test": "node migrations/test-migration-logic.js"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
