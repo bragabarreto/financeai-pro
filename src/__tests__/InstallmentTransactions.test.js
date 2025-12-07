@@ -22,6 +22,14 @@ describe('Installment Transaction Creation Logic', () => {
     // Use parseLocalDate for accurate date parsing without timezone issues
     const startDate = parseLocalDate(transactionData.date);
     
+    // Calculate the last installment date
+    const lastInstallmentDate = new Date(startDate);
+    lastInstallmentDate.setMonth(startDate.getMonth() + installmentCount - 1);
+    const lastYear = lastInstallmentDate.getFullYear();
+    const lastMonth = String(lastInstallmentDate.getMonth() + 1).padStart(2, '0');
+    const lastDay = String(lastInstallmentDate.getDate()).padStart(2, '0');
+    const formattedLastDate = `${lastYear}-${lastMonth}-${lastDay}`;
+    
     for (let i = 0; i < installmentCount; i++) {
       const installmentDate = new Date(startDate);
       installmentDate.setMonth(startDate.getMonth() + i);
@@ -36,6 +44,7 @@ describe('Installment Transaction Creation Logic', () => {
         type: transactionData.type,
         description: `${transactionData.description} (${i + 1}/${installmentCount})`,
         amount: installmentAmount,
+        total_amount: totalAmount,
         category: transactionData.category,
         account_id: transactionData.account_id || null,
         card_id: transactionData.card_id || null,
@@ -45,7 +54,8 @@ describe('Installment Transaction Creation Logic', () => {
         is_alimony: transactionData.is_alimony || false,
         is_installment: true,
         installment_count: installmentCount,
-        installment_number: i + 1 // Track which installment number this is (1-based)
+        installment_number: i + 1, // Track which installment number this is (1-based)
+        last_installment_date: formattedLastDate
       });
     }
     
@@ -511,6 +521,144 @@ describe('Installment Transaction Creation Logic', () => {
       transactions.forEach(transaction => {
         expect(transaction.account_id).toBe('acc_123');
         expect(transaction.card_id).toBeNull();
+      });
+    });
+  });
+
+  describe('New Fields: total_amount and last_installment_date', () => {
+    it('should include total_amount in all installment transactions', () => {
+      const transactionData = {
+        type: 'expense',
+        description: 'Notebook',
+        amount: 3600,
+        date: '2025-01-15',
+        category: 'cat_electronics',
+        payment_method: 'credit_card',
+        card_id: 'card_123',
+        is_installment: true,
+        installment_count: 12
+      };
+
+      const transactions = createInstallmentTransactions(transactionData, 'user_123');
+      
+      transactions.forEach(transaction => {
+        expect(transaction.total_amount).toBe(3600);
+        expect(transaction.amount).toBe(300); // 3600 / 12
+      });
+    });
+
+    it('should include last_installment_date in all installment transactions', () => {
+      const transactionData = {
+        type: 'expense',
+        description: 'Compra Parcelada',
+        amount: 1200,
+        date: '2025-01-15',
+        category: 'cat_123',
+        payment_method: 'credit_card',
+        card_id: 'card_123',
+        is_installment: true,
+        installment_count: 6
+      };
+
+      const transactions = createInstallmentTransactions(transactionData, 'user_123');
+      
+      transactions.forEach(transaction => {
+        expect(transaction.last_installment_date).toBe('2025-06-15');
+      });
+    });
+
+    it('should calculate last_installment_date correctly for different installment counts', () => {
+      const testCases = [
+        { installment_count: 2, startDate: '2025-01-15', expectedLast: '2025-02-15' },
+        { installment_count: 3, startDate: '2025-03-10', expectedLast: '2025-05-10' },
+        { installment_count: 12, startDate: '2025-01-20', expectedLast: '2025-12-20' },
+        { installment_count: 24, startDate: '2025-06-15', expectedLast: '2027-05-15' }
+      ];
+
+      testCases.forEach(({ installment_count, startDate, expectedLast }) => {
+        const transactionData = {
+          type: 'expense',
+          description: 'Test',
+          amount: 1200,
+          date: startDate,
+          category: 'cat_123',
+          payment_method: 'credit_card',
+          card_id: 'card_123',
+          is_installment: true,
+          installment_count
+        };
+
+        const transactions = createInstallmentTransactions(transactionData, 'user_123');
+        
+        transactions.forEach(transaction => {
+          expect(transaction.last_installment_date).toBe(expectedLast);
+        });
+      });
+    });
+
+    it('should preserve total_amount across all installments even with uneven division', () => {
+      const transactionData = {
+        type: 'expense',
+        description: 'Compra',
+        amount: 1000,
+        date: '2025-01-15',
+        category: 'cat_123',
+        payment_method: 'credit_card',
+        card_id: 'card_123',
+        is_installment: true,
+        installment_count: 3
+      };
+
+      const transactions = createInstallmentTransactions(transactionData, 'user_123');
+      
+      transactions.forEach(transaction => {
+        expect(transaction.total_amount).toBe(1000);
+      });
+
+      // Verify that sum of installment amounts equals total
+      const sumOfInstallments = transactions.reduce((sum, t) => sum + t.amount, 0);
+      expect(sumOfInstallments).toBeCloseTo(1000, 2);
+    });
+
+    it('should set same last_installment_date for all installments in a group', () => {
+      const transactionData = {
+        type: 'expense',
+        description: 'Móveis',
+        amount: 4800,
+        date: '2025-02-28',
+        category: 'cat_furniture',
+        payment_method: 'credit_card',
+        card_id: 'card_123',
+        is_installment: true,
+        installment_count: 8
+      };
+
+      const transactions = createInstallmentTransactions(transactionData, 'user_123');
+      
+      const lastDates = transactions.map(t => t.last_installment_date);
+      const uniqueDates = [...new Set(lastDates)];
+      
+      expect(uniqueDates).toHaveLength(1);
+      expect(uniqueDates[0]).toBe('2025-09-28');
+    });
+
+    it('should correctly handle year transitions in last_installment_date', () => {
+      const transactionData = {
+        type: 'expense',
+        description: 'Compra de Natal',
+        amount: 2400,
+        date: '2025-11-15',
+        category: 'cat_gifts',
+        payment_method: 'credit_card',
+        card_id: 'card_123',
+        is_installment: true,
+        installment_count: 6
+      };
+
+      const transactions = createInstallmentTransactions(transactionData, 'user_123');
+      
+      transactions.forEach(transaction => {
+        expect(transaction.last_installment_date).toBe('2026-04-15');
       });
     });
   });
