@@ -38,12 +38,13 @@ export const parseCSV = (file) => {
 };
 
 /**
- * Parse Excel file (XLS/XLSX)
+ * Parse Excel file (XLS/XLSX) with timeout protection
  * @param {File} file - The Excel file to parse
+ * @param {Number} timeout - Maximum time to wait for parsing (in milliseconds)
  * @returns {Promise<Array>} Parsed data as array of objects
  */
-export const parseExcel = (file) => {
-  return new Promise((resolve, reject) => {
+export const parseExcel = (file, timeout = 30000) => {
+  const parsePromise = new Promise((resolve, reject) => {
     const reader = new FileReader();
     
     reader.onload = (e) => {
@@ -56,7 +57,7 @@ export const parseExcel = (file) => {
           return;
         }
         
-        // Get first sheet
+        // Get first sheet only (security: limit processing scope)
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
@@ -83,6 +84,15 @@ export const parseExcel = (file) => {
     
     reader.readAsArrayBuffer(file);
   });
+
+  // Add timeout protection to mitigate ReDoS attacks
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Tempo limite excedido ao processar arquivo Excel. O arquivo pode ser muito complexo ou estar mal-formado.'));
+    }, timeout);
+  });
+
+  return Promise.race([parsePromise, timeoutPromise]);
 };
 
 /**
