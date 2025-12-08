@@ -98,12 +98,16 @@ ADD COLUMN IF NOT EXISTS installment_due_dates TEXT[];
 ALTER TABLE transactions 
 ADD COLUMN IF NOT EXISTS last_installment_date DATE;
 
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10, 2);
+
 -- 13. Adicionar comentários nas colunas
 COMMENT ON COLUMN transactions.is_installment IS 'Indica se a transação é parcelada';
 COMMENT ON COLUMN transactions.installment_count IS 'Quantidade total de parcelas';
 COMMENT ON COLUMN transactions.installment_number IS 'Número da parcela atual (1, 2, 3, etc.)';
 COMMENT ON COLUMN transactions.installment_due_dates IS 'Array com datas de vencimento mensal (deprecated)';
 COMMENT ON COLUMN transactions.last_installment_date IS 'Data da última parcela (deprecated)';
+COMMENT ON COLUMN transactions.total_amount IS 'Valor total da compra parcelada (soma de todas as parcelas)';
 
 -- 14. Criar índice para consultas de transações parceladas
 CREATE INDEX IF NOT EXISTS idx_transactions_installment 

@@ -390,6 +390,7 @@ const handleSaveAccount = async (accountData) => {
             is_alimony: transactionData.is_alimony || false,
             is_installment: true,
             installment_count: installmentCount,
+            installment_number: i + 1,
             last_installment_date: formattedLastDate
           });
         }
