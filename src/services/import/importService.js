@@ -303,7 +303,6 @@ export const importTransactions = async (transactions, userId, accountId, catego
             created_at: new Date().toISOString(),
             is_installment: true,
             installment_count: installmentCount,
-            installment_number: i + 1,
             installment_due_dates: null,
             last_installment_date: lastInstallmentDate
           });

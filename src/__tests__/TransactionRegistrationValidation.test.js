@@ -131,7 +131,7 @@ describe('Transaction Registration Validation', () => {
     it('should validate installment fields when is_installment is true', () => {
       const installmentTransaction = {
         type: 'expense',
-        description: 'Compra parcelada',
+        description: 'Compra parcelada (1/12)', // Installment number is now in description
         amount: 1200.00,
         date: '2025-10-10',
         category: 'cat_123',
@@ -140,7 +140,6 @@ describe('Transaction Registration Validation', () => {
         user_id: 'user_123',
         is_installment: true,
         installment_count: 12,
-        installment_number: 1, // New field: which installment number this is (1-12)
         installment_due_dates: [
           '2025-10-10', '2025-11-10', '2025-12-10',
           '2026-01-10', '2026-02-10', '2026-03-10',
@@ -152,7 +151,7 @@ describe('Transaction Registration Validation', () => {
 
       expect(installmentTransaction.is_installment).toBe(true);
       expect(installmentTransaction.installment_count).toBe(12);
-      expect(installmentTransaction.installment_number).toBe(1);
+      expect(installmentTransaction.description).toContain('(1/12)');
       expect(installmentTransaction.installment_due_dates).toHaveLength(12);
       expect(installmentTransaction.last_installment_date).toBe('2026-09-10');
     });

@@ -5,7 +5,7 @@
  * 1. Multiple transactions created for each installment
  * 2. Each installment has correct due date (monthly intervals)
  * 3. Installment amounts are correctly calculated
- * 4. Each installment is properly numbered
+ * 4. Description includes installment number in format (X/Y)
  * 5. Future transactions are correctly identified
  */
 
@@ -54,7 +54,6 @@ describe('Installment Transaction Creation Logic', () => {
         is_alimony: transactionData.is_alimony || false,
         is_installment: true,
         installment_count: installmentCount,
-        installment_number: i + 1, // Track which installment number this is (1-based)
         last_installment_date: formattedLastDate
       });
     }
@@ -219,7 +218,7 @@ describe('Installment Transaction Creation Logic', () => {
   });
 
   describe('Installment Number Tracking', () => {
-    it('should assign correct installment_number to each transaction', () => {
+    it('should include installment number in description for each transaction', () => {
       const transactionData = {
         type: 'expense',
         description: 'Compra Parcelada',
@@ -235,7 +234,7 @@ describe('Installment Transaction Creation Logic', () => {
       const transactions = createInstallmentTransactions(transactionData, 'user_123');
       
       for (let i = 0; i < 12; i++) {
-        expect(transactions[i].installment_number).toBe(i + 1);
+        expect(transactions[i].description).toContain(`(${i + 1}/12)`);
       }
     });
 
@@ -454,8 +453,6 @@ describe('Installment Transaction Creation Logic', () => {
       expect(transactions).toHaveLength(2);
       expect(transactions[0].amount).toBe(100);
       expect(transactions[1].amount).toBe(100);
-      expect(transactions[0].installment_number).toBe(1);
-      expect(transactions[1].installment_number).toBe(2);
       expect(transactions[0].description).toBe('Compra Simples (1/2)');
       expect(transactions[1].description).toBe('Compra Simples (2/2)');
     });
@@ -477,7 +474,7 @@ describe('Installment Transaction Creation Logic', () => {
       
       expect(transactions).toHaveLength(48);
       expect(transactions[0].amount).toBe(1000);
-      expect(transactions[47].installment_number).toBe(48);
+      expect(transactions[47].description).toBe('Financiamento (48/48)');
     });
 
     it('should handle null account_id for credit card payments', () => {
