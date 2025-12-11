@@ -13,6 +13,7 @@ import { extractFromPhoto } from '../../services/import/photoExtractorAI';
 import { extractFromPaycheck } from '../../services/import/paycheckExtractorAI';
 import { useAIConfig, checkAIAvailability } from '../../hooks/useAIConfig';
 import { enrichTransactionsWithHistory, matchCardByDigits } from '../../services/import/transactionMatcher';
+import { createImportHistory, updateImportHistory } from '../../services/supabase';
 import PaycheckPreview from './PaycheckPreview';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
@@ -855,8 +856,6 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
 
     try {
       // Create import_history record
-      const { createImportHistory, updateImportHistory } = await import('../../services/supabase');
-      
       const importHistoryData = {
         user_id: user.id,
         file_name: file?.name || (importMode === 'text' ? 'SMS Import' : importMode === 'photo' ? 'Photo Import' : 'Paycheck Import'),

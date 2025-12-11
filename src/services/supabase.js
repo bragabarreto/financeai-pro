@@ -137,12 +137,11 @@ export const getTransactions = async (userId, options = {}) => {
     query = query.eq('type', type);
   }
   
-  // Apply pagination
-  if (limit) {
-    query = query.limit(limit);
-  }
-  if (offset) {
-    query = query.range(offset, offset + (limit || 100) - 1);
+  // Apply pagination using range (more reliable than limit)
+  if (offset !== undefined || limit !== undefined) {
+    const start = offset || 0;
+    const end = start + (limit || 100) - 1;
+    query = query.range(start, end);
   }
   
   query = query.order('date', { ascending: false });

@@ -13,8 +13,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -69,7 +69,7 @@ const convertToCSV = (data) => {
       
       // Escape commas and quotes in strings
       if (typeof value === 'string') {
-        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+        if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
           value = `"${value.replace(/"/g, '""')}"`;
         }
       }

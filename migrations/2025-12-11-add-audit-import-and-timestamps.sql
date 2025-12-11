@@ -1,5 +1,5 @@
 -- Migration Script: Add Transaction Audit, Import History and Timestamps
--- Data: 2025-12-11
+-- Date: 2025-12-11
 -- Description: Adds complete historical persistence for transactions with audit logging and import tracking
 
 -- ============================================================================

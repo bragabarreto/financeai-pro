@@ -171,7 +171,7 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
       if (endDate) params.append('endDate', endDate);
       
       // Call export endpoint
-      const apiUrl = process.env.REACT_APP_API_URL || '';
+      const apiUrl = process.env.REACT_APP_API_URL || window.location.origin;
       const response = await fetch(`${apiUrl}/api/export-transactions?${params.toString()}`);
       
       if (!response.ok) {
