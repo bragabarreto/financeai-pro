@@ -3,7 +3,7 @@ import {
   X, Upload, FileText, AlertCircle, CheckCircle, 
   Loader, Download, Eye, Edit2, Trash2, Save,
   AlertTriangle, MessageSquare, Sparkles, DollarSign,
-  History, CreditCard
+  History, CreditCard, Clock
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
 import { formatDateLocal, formatBrazilianDate } from '../../utils/dateUtils';
@@ -13,6 +13,7 @@ import { extractFromPhoto } from '../../services/import/photoExtractorAI';
 import { extractFromPaycheck } from '../../services/import/paycheckExtractorAI';
 import { useAIConfig, checkAIAvailability } from '../../hooks/useAIConfig';
 import { enrichTransactionsWithHistory, matchCardByDigits } from '../../services/import/transactionMatcher';
+import { createImportHistory, updateImportHistory } from '../../services/supabase';
 import PaycheckPreview from './PaycheckPreview';
 
 const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) => {
@@ -853,7 +854,37 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setLoading(true);
     setError('');
 
+    let importHistoryId = null;
+
     try {
+      // Criar registro de import_history antes da importação
+      const importSource = importMode === 'file' ? 'csv' : 
+                          importMode === 'text' ? 'sms' : 
+                          importMode === 'photo' ? 'photo' : 
+                          importMode === 'paycheck' ? 'paycheck' : 'manual';
+      
+      const importHistoryData = {
+        userId: user.id,
+        source: importSource,
+        fileName: file?.name || paycheckFile?.name || photoFile?.name || null,
+        totalRows: selectedTransactions.length,
+        metadata: {
+          aiEnhanced: useAI && isAIAvailable(),
+          processedAt: new Date().toISOString()
+        }
+      };
+
+      try {
+        const { data: importData, error: importHistoryError } = await createImportHistory(importHistoryData);
+        if (!importHistoryError && importData && importData[0]) {
+          importHistoryId = importData[0].id;
+          console.log(`📝 Import history criado: ${importHistoryId}`);
+        }
+      } catch (historyErr) {
+        console.warn('Aviso: Não foi possível criar import_history:', historyErr);
+        // Continuar com a importação mesmo sem o histórico
+      }
+
       // Create category mapping (normalized for robust lookups)
       const categoryMapping = {};
       Object.values(categories).flat().forEach(cat => {
@@ -866,17 +897,55 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       // Use the first account as fallback (not used since we validate above)
       const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
 
+      // Adicionar import_id ao metadata das transações
+      const transactionsWithImportId = selectedTransactions.map(t => ({
+        ...t,
+        metadata: {
+          ...(t.metadata || {}),
+          import_id: importHistoryId,
+          imported_at: new Date().toISOString()
+        }
+      }));
+
       const result = await importTransactions(
-        // Ensure we rely on categoryId primarily to avoid name variance
-        selectedTransactions.map(t => ({ ...t })),
+        transactionsWithImportId,
         user.id,
         fallbackAccountId,
         categoryMapping
       );
 
-      setImportResult(result);
+      // Atualizar import_history com o resultado
+      if (importHistoryId) {
+        try {
+          await updateImportHistory(importHistoryId, {
+            imported_count: result.imported || 0,
+            failed_count: result.failed || 0,
+            status: result.success ? 'completed' : (result.imported > 0 ? 'partial' : 'failed'),
+            error_details: result.failedTransactions || []
+          });
+          console.log(`✅ Import history atualizado: ${result.imported} importadas, ${result.failed} falharam`);
+        } catch (updateErr) {
+          console.warn('Aviso: Não foi possível atualizar import_history:', updateErr);
+        }
+      }
+
+      setImportResult({
+        ...result,
+        importHistoryId
+      });
       setStep(3);
     } catch (err) {
+      // Atualizar import_history com erro
+      if (importHistoryId) {
+        try {
+          await updateImportHistory(importHistoryId, {
+            status: 'failed',
+            error_details: [{ message: err.message || 'Erro desconhecido' }]
+          });
+        } catch (updateErr) {
+          console.warn('Aviso: Não foi possível atualizar import_history com erro:', updateErr);
+        }
+      }
       setError(err.message || 'Erro ao importar transações');
     } finally {
       setLoading(false);
@@ -1928,6 +1997,25 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
                   <p className="text-3xl font-bold text-red-600">{importResult.failed}</p>
                 </div>
               </div>
+
+              {/* Informações de auditoria */}
+              {importResult.importHistoryId && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg text-left">
+                  <div className="flex items-center text-blue-800 mb-2">
+                    <Clock className="w-4 h-4 mr-2" />
+                    <span className="font-semibold">Registro de Importação</span>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    ID: <code className="bg-blue-100 px-1 rounded">{importResult.importHistoryId}</code>
+                  </p>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Data: {new Date().toLocaleString('pt-BR')}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-2">
+                    Este registro permite rastrear e auditar as transações importadas.
+                  </p>
+                </div>
+              )}
 
               {importResult.failed > 0 && (
                 <div className="bg-yellow-50 p-4 rounded-lg text-left">
