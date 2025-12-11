@@ -857,9 +857,18 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       // Create import history record
       const { createImportHistory, updateImportHistory } = await import('../../services/supabase');
       
+      // Helper function to get import file name based on mode
+      const getImportFileName = () => {
+        if (file?.name) return file.name;
+        if (importMode === 'text') return 'SMS/Text Import';
+        if (importMode === 'photo') return photoFile?.name || 'Photo Import';
+        if (importMode === 'paycheck') return paycheckFile?.name || 'Paycheck Import';
+        return 'Unknown Import';
+      };
+      
       const importHistoryData = {
         user_id: user.id,
-        file_name: file?.name || importMode === 'text' ? 'SMS/Text Import' : importMode === 'photo' ? photoFile?.name || 'Photo Import' : paycheckFile?.name || 'Paycheck Import',
+        file_name: getImportFileName(),
         file_size: file?.size || photoFile?.size || paycheckFile?.size || 0,
         total_rows: editingTransactions.length,
         extracted_transactions: selectedTransactions.length,

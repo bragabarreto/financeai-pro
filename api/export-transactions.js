@@ -13,9 +13,18 @@ const { createClient } = require('@supabase/supabase-js');
 const { parse } = require('json2csv');
 
 module.exports = async (req, res) => {
-  // Set CORS headers
+  // Set CORS headers - restrict to specific origins in production
+  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['*'];
+  
+  const origin = req.headers.origin;
+  const allowedOrigin = allowedOrigins.includes('*') || allowedOrigins.includes(origin)
+    ? (allowedOrigins.includes('*') ? '*' : origin)
+    : allowedOrigins[0];
+
   res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
@@ -41,10 +50,10 @@ module.exports = async (req, res) => {
 
     // Initialize Supabase client
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase configuration');
+      console.error('Missing Supabase configuration - SUPABASE_SERVICE_KEY is required');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 

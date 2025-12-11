@@ -33,34 +33,40 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
     
     const now = new Date();
     const filtered = transactions.filter(t => {
-      const [y, m, d] = String(t.date).split('-').map(Number);
-      const tDate = new Date(y, (m || 1) - 1, d || 1);
-      
-      if (period === 'custom' && customStartDate && customEndDate) {
-        const start = parseISO(customStartDate);
-        const end = parseISO(customEndDate);
-        return isWithinInterval(tDate, { start, end });
+      try {
+        const [y, m, d] = String(t.date).split('-').map(Number);
+        if (!y || !m) return false; // Skip invalid dates
+        const tDate = new Date(y, (m || 1) - 1, d || 1);
+        
+        if (period === 'custom' && customStartDate && customEndDate) {
+          const start = parseISO(customStartDate);
+          const end = parseISO(customEndDate);
+          return isWithinInterval(tDate, { start, end });
+        }
+        
+        if (period === 'month') {
+          return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+        }
+        
+        if (period === '3months') {
+          const threeMonthsAgo = subMonths(now, 3);
+          return tDate >= threeMonthsAgo;
+        }
+        
+        if (period === '6months') {
+          const sixMonthsAgo = subMonths(now, 6);
+          return tDate >= sixMonthsAgo;
+        }
+        
+        if (period === 'year') {
+          return tDate.getFullYear() === now.getFullYear();
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error parsing transaction date:', t.date, error);
+        return false; // Skip transactions with invalid dates
       }
-      
-      if (period === 'month') {
-        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-      }
-      
-      if (period === '3months') {
-        const threeMonthsAgo = subMonths(now, 3);
-        return tDate >= threeMonthsAgo;
-      }
-      
-      if (period === '6months') {
-        const sixMonthsAgo = subMonths(now, 6);
-        return tDate >= sixMonthsAgo;
-      }
-      
-      if (period === 'year') {
-        return tDate.getFullYear() === now.getFullYear();
-      }
-      
-      return true;
     });
     return filtered;
   };
@@ -170,9 +176,9 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
         params.append('endDate', endOfMonth(new Date()).toISOString().split('T')[0]);
       }
 
-      // Call the export endpoint
-      const baseUrl = process.env.REACT_APP_API_URL || window.location.origin;
-      const response = await fetch(`${baseUrl}/api/export-transactions?${params.toString()}`);
+      // Call the export endpoint - use environment variable or default to same origin
+      const apiUrl = process.env.REACT_APP_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/export-transactions?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error('Falha ao exportar transações');

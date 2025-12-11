@@ -107,6 +107,11 @@ export const deleteAccount = async (id) => {
 
 // TRANSACTIONS
 export const getTransactions = async (userId, options = {}) => {
+  // Support backward compatibility: if second parameter is a boolean, treat it as includeDeleted
+  if (typeof options === 'boolean') {
+    options = { includeDeleted: options };
+  }
+  
   const { includeDeleted = false, limit, offset } = options;
   
   let query = supabase
@@ -198,9 +203,10 @@ export const deleteTransaction = async (id) => {
     .single();
   
   // Implement soft-delete by setting deleted_at timestamp
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('transactions')
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: now })
     .eq('id', id)
     .select();
   
@@ -224,6 +230,7 @@ export const deleteTransaction = async (id) => {
 
 // Helper function to create audit log entries
 const createAuditLog = async (auditData) => {
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from('transaction_audit')
     .insert([{
@@ -231,7 +238,7 @@ const createAuditLog = async (auditData) => {
       user_id: auditData.user_id,
       action: auditData.action,
       payload: auditData.payload,
-      timestamp: new Date().toISOString()
+      timestamp: now
     }]);
   
   if (error) {
