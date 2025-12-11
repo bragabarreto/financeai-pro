@@ -6,14 +6,17 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, DollarSign, Target, 
-  AlertCircle, Calendar, CreditCard, PiggyBank 
+  AlertCircle, Calendar, CreditCard, PiggyBank, Download 
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO, isWithinInterval, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const Dashboard = ({ transactions, categories, accounts, user }) => {
-  const [period, setPeriod] = useState('month'); // month, year, all
+  const [period, setPeriod] = useState('month'); // month, 3months, 6months, year, all, custom
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [goals, setGoals] = useState({
     savings: 1000,
     expenses: 3000
@@ -27,15 +30,33 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
     if (period === 'all') return transactions;
     
     const now = new Date();
+    let startDate, endDate;
+    
+    if (period === 'custom' && customStartDate && customEndDate) {
+      startDate = parseISO(customStartDate);
+      endDate = parseISO(customEndDate);
+    } else if (period === 'month') {
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+    } else if (period === '3months') {
+      startDate = subMonths(now, 3);
+      endDate = now;
+    } else if (period === '6months') {
+      startDate = subMonths(now, 6);
+      endDate = now;
+    } else if (period === 'year') {
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now.getFullYear(), 11, 31);
+    }
+    
     const filtered = transactions.filter(t => {
       const [y, m, d] = String(t.date).split('-').map(Number);
       const tDate = new Date(y, (m || 1) - 1, d || 1);
-      if (period === 'month') {
-        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      
+      if (period === 'custom' || period === 'month' || period === '3months' || period === '6months' || period === 'year') {
+        return isWithinInterval(tDate, { start: startDate, end: endDate });
       }
-      if (period === 'year') {
-        return tDate.getFullYear() === now.getFullYear();
-      }
+      
       return true;
     });
     return filtered;
@@ -89,6 +110,7 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
   const getCategoryData = () => {
     const filtered = getFilteredTransactions();
     const categoryTotals = {};
+    const categoryCount = {};
 
     filtered.forEach(t => {
       const category = categories[t.type]?.find(c => c.id === t.category);
@@ -99,14 +121,78 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
             value: 0,
             icon: category.icon,
             color: category.color,
-            type: t.type
+            type: t.type,
+            count: 0
           };
         }
         categoryTotals[category.name].value += t.amount;
+        categoryTotals[category.name].count += 1;
       }
     });
 
     return Object.values(categoryTotals).sort((a, b) => b.value - a.value);
+  };
+  
+  // Export to CSV function
+  const handleExportCSV = async () => {
+    try {
+      if (!user || !user.id) {
+        alert('Usuário não identificado');
+        return;
+      }
+      
+      // Get filtered date range
+      let startDate, endDate;
+      const now = new Date();
+      
+      if (period === 'custom' && customStartDate && customEndDate) {
+        startDate = customStartDate;
+        endDate = customEndDate;
+      } else if (period === 'month') {
+        startDate = format(startOfMonth(now), 'yyyy-MM-dd');
+        endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+      } else if (period === '3months') {
+        startDate = format(subMonths(now, 3), 'yyyy-MM-dd');
+        endDate = format(now, 'yyyy-MM-dd');
+      } else if (period === '6months') {
+        startDate = format(subMonths(now, 6), 'yyyy-MM-dd');
+        endDate = format(now, 'yyyy-MM-dd');
+      } else if (period === 'year') {
+        startDate = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd');
+        endDate = format(new Date(now.getFullYear(), 11, 31), 'yyyy-MM-dd');
+      }
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        userId: user.id
+      });
+      
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      
+      // Call export endpoint
+      const apiUrl = process.env.REACT_APP_API_URL || window.location.origin;
+      const response = await fetch(`${apiUrl}/api/export-transactions?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error('Falha ao exportar transações');
+      }
+      
+      // Download file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${format(now, 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Erro ao exportar transações: ' + error.message);
+    }
   };
 
   // Calcular progresso das metas
@@ -131,29 +217,83 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
   return (
     <div className="space-y-6">
       {/* Header com seletor de período */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-2xl font-bold">Dashboard Financeiro</h1>
-        <div className="flex space-x-2">
+        
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Period selector buttons */}
           <button
-            onClick={() => setPeriod('month')}
-            className={`px-4 py-2 rounded-lg ${period === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            onClick={() => { setPeriod('month'); setShowCustomDatePicker(false); }}
+            className={`px-3 py-2 rounded-lg text-sm ${period === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
           >
-            Mês
+            Mês Atual
           </button>
           <button
-            onClick={() => setPeriod('year')}
-            className={`px-4 py-2 rounded-lg ${period === 'year' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            onClick={() => { setPeriod('3months'); setShowCustomDatePicker(false); }}
+            className={`px-3 py-2 rounded-lg text-sm ${period === '3months' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          >
+            Últimos 3 Meses
+          </button>
+          <button
+            onClick={() => { setPeriod('6months'); setShowCustomDatePicker(false); }}
+            className={`px-3 py-2 rounded-lg text-sm ${period === '6months' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          >
+            Últimos 6 Meses
+          </button>
+          <button
+            onClick={() => { setPeriod('year'); setShowCustomDatePicker(false); }}
+            className={`px-3 py-2 rounded-lg text-sm ${period === 'year' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
           >
             Ano
           </button>
           <button
-            onClick={() => setPeriod('all')}
-            className={`px-4 py-2 rounded-lg ${period === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            onClick={() => { setPeriod('all'); setShowCustomDatePicker(false); }}
+            className={`px-3 py-2 rounded-lg text-sm ${period === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
           >
-            Tudo
+            Todo Histórico
+          </button>
+          <button
+            onClick={() => { setShowCustomDatePicker(!showCustomDatePicker); setPeriod('custom'); }}
+            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 ${period === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+          >
+            <Calendar className="w-4 h-4" />
+            Customizado
+          </button>
+          
+          {/* Export button */}
+          <button
+            onClick={handleExportCSV}
+            className="px-3 py-2 rounded-lg text-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+          >
+            <Download className="w-4 h-4" />
+            Exportar CSV
           </button>
         </div>
       </div>
+
+      {/* Custom date picker */}
+      {showCustomDatePicker && (
+        <div className="bg-white rounded-xl shadow-lg p-4 flex gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Data Início:</label>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="border rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Data Fim:</label>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="border rounded px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -255,7 +395,7 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
           </ResponsiveContainer>
         </div>
 
-        {/* Gastos por Categoria */}
+        {/* Gastos por Categoria - Pie Chart */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h2 className="text-lg font-bold mb-4">Gastos por Categoria</h2>
           <ResponsiveContainer width="100%" height={300}>
@@ -274,37 +414,73 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+              <Tooltip 
+                formatter={(value, name, props) => {
+                  const percent = ((value / totals.expenses) * 100).toFixed(1);
+                  const count = props.payload.count;
+                  return [`R$ ${value.toFixed(2)} (${percent}%) - ${count} transações`, 'Valor'];
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
+      {/* Horizontal Bar Chart for Top Categories */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h2 className="text-lg font-bold mb-4">Top 10 Categorias por Valor</h2>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart 
+            data={categoryData.slice(0, 10)} 
+            layout="vertical"
+            margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" />
+            <YAxis dataKey="name" type="category" width={90} />
+            <Tooltip 
+              formatter={(value, name, props) => {
+                const total = totals[props.payload.type === 'expense' ? 'expenses' : props.payload.type === 'income' ? 'income' : 'investments'];
+                const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                const count = props.payload.count;
+                return [`R$ ${value.toFixed(2)} (${percent}% do total) - ${count} transações`, 'Valor'];
+              }}
+            />
+            <Legend />
+            <Bar dataKey="value" fill="#3B82F6" name="Valor" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
       {/* Top Categorias */}
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <h2 className="text-lg font-bold mb-4">Top Categorias</h2>
+        <h2 className="text-lg font-bold mb-4">Top Categorias - Resumo</h2>
         <div className="space-y-3">
-          {categoryData.slice(0, 5).map((cat, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 rounded-full ${cat.color || 'bg-gray-500'} flex items-center justify-center text-white`}>
-                  <span>{cat.icon || '💰'}</span>
+          {categoryData.slice(0, 5).map((cat, index) => {
+            const totalForType = totals[cat.type === 'expense' ? 'expenses' : cat.type === 'income' ? 'income' : 'investments'];
+            const percent = totalForType > 0 ? ((cat.value / totalForType) * 100).toFixed(1) : 0;
+            return (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-10 h-10 rounded-full ${cat.color || 'bg-gray-500'} flex items-center justify-center text-white`}>
+                    <span>{cat.icon || '💰'}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium">{cat.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {cat.type === 'expense' ? 'Gasto' : cat.type === 'income' ? 'Receita' : 'Investimento'} • {cat.count} transações
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">{cat.name}</p>
+                <div className="text-right">
+                  <p className="font-bold">R$ {cat.value.toFixed(2)}</p>
                   <p className="text-sm text-gray-600">
-                    {cat.type === 'expense' ? 'Gasto' : cat.type === 'income' ? 'Receita' : 'Investimento'}
+                    {percent}% do total
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-bold">R$ {cat.value.toFixed(2)}</p>
-                <p className="text-sm text-gray-600">
-                  {((cat.value / (cat.type === 'expense' ? totals.expenses : cat.type === 'income' ? totals.income : totals.investments)) * 100).toFixed(1)}%
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
