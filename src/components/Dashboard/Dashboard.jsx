@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AlimonyWidget from './AlimonyWidget';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -6,14 +6,31 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, DollarSign, Target, 
-  AlertCircle, Calendar, CreditCard, PiggyBank 
+  AlertCircle, Calendar, CreditCard, PiggyBank, Download, ChevronDown 
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subDays, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getExportUrl } from '../../services/supabase';
+
+// Opções de período disponíveis
+const PERIOD_OPTIONS = [
+  { value: 'month', label: 'Este Mês' },
+  { value: '3months', label: 'Últimos 3 Meses' },
+  { value: '6months', label: 'Últimos 6 Meses' },
+  { value: 'year', label: 'Este Ano' },
+  { value: 'all', label: 'Todo o Histórico' },
+  { value: 'custom', label: 'Personalizado' }
+];
 
 const Dashboard = ({ transactions, categories, accounts, user }) => {
-  const [period, setPeriod] = useState('month'); // month, year, all
+  const [period, setPeriod] = useState('month');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState({
+    startDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd')
+  });
+  const [chartType, setChartType] = useState('pie'); // 'pie' ou 'bar' para gráfico de categorias
   const [goals, setGoals] = useState({
     savings: 1000,
     expenses: 3000
@@ -22,21 +39,52 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
   // Cores para os gráficos
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6'];
 
+  // Calcular datas do período selecionado
+  const getDateRange = useMemo(() => {
+    const now = new Date();
+    
+    switch (period) {
+      case 'month':
+        return {
+          start: startOfMonth(now),
+          end: endOfMonth(now)
+        };
+      case '3months':
+        return {
+          start: startOfMonth(subMonths(now, 2)),
+          end: endOfMonth(now)
+        };
+      case '6months':
+        return {
+          start: startOfMonth(subMonths(now, 5)),
+          end: endOfMonth(now)
+        };
+      case 'year':
+        return {
+          start: startOfYear(now),
+          end: endOfYear(now)
+        };
+      case 'custom':
+        return {
+          start: new Date(customDateRange.startDate),
+          end: new Date(customDateRange.endDate)
+        };
+      case 'all':
+      default:
+        return null;
+    }
+  }, [period, customDateRange]);
+
   // Calcular dados baseados no período
   const getFilteredTransactions = () => {
-    if (period === 'all') return transactions;
+    if (period === 'all' || !getDateRange) return transactions;
     
-    const now = new Date();
+    const { start, end } = getDateRange;
+    
     const filtered = transactions.filter(t => {
       const [y, m, d] = String(t.date).split('-').map(Number);
       const tDate = new Date(y, (m || 1) - 1, d || 1);
-      if (period === 'month') {
-        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-      }
-      if (period === 'year') {
-        return tDate.getFullYear() === now.getFullYear();
-      }
-      return true;
+      return tDate >= start && tDate <= end;
     });
     return filtered;
   };
@@ -128,32 +176,96 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
   const categoryData = getCategoryData();
   const goalProgress = calculateGoalProgress();
 
+  // Função para exportar CSV
+  const handleExportCSV = () => {
+    if (!user?.id) return;
+    
+    const options = {};
+    if (getDateRange) {
+      options.startDate = format(getDateRange.start, 'yyyy-MM-dd');
+      options.endDate = format(getDateRange.end, 'yyyy-MM-dd');
+    }
+    
+    const exportUrl = getExportUrl(user.id, options);
+    window.open(exportUrl, '_blank');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header com seletor de período */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-2xl font-bold">Dashboard Financeiro</h1>
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-3">
+          {/* Dropdown de período */}
+          <div className="relative">
+            <button
+              onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+              className="flex items-center px-4 py-2 bg-white border rounded-lg shadow-sm hover:bg-gray-50"
+            >
+              <Calendar className="w-4 h-4 mr-2 text-gray-600" />
+              <span>{PERIOD_OPTIONS.find(p => p.value === period)?.label || 'Período'}</span>
+              <ChevronDown className="w-4 h-4 ml-2 text-gray-600" />
+            </button>
+            
+            {showPeriodDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border z-50">
+                {PERIOD_OPTIONS.map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setPeriod(option.value);
+                      setShowPeriodDropdown(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg ${
+                      period === option.value ? 'bg-blue-50 text-blue-600' : ''
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Seletor de datas personalizado */}
+          {period === 'custom' && (
+            <div className="flex items-center space-x-2">
+              <input
+                type="date"
+                value={customDateRange.startDate}
+                onChange={(e) => setCustomDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                className="px-3 py-2 border rounded-lg text-sm"
+              />
+              <span className="text-gray-500">até</span>
+              <input
+                type="date"
+                value={customDateRange.endDate}
+                onChange={(e) => setCustomDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                className="px-3 py-2 border rounded-lg text-sm"
+              />
+            </div>
+          )}
+          
+          {/* Botão de exportação */}
           <button
-            onClick={() => setPeriod('month')}
-            className={`px-4 py-2 rounded-lg ${period === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            onClick={handleExportCSV}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            title="Exportar transações como CSV"
           >
-            Mês
-          </button>
-          <button
-            onClick={() => setPeriod('year')}
-            className={`px-4 py-2 rounded-lg ${period === 'year' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          >
-            Ano
-          </button>
-          <button
-            onClick={() => setPeriod('all')}
-            className={`px-4 py-2 rounded-lg ${period === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          >
-            Tudo
+            <Download className="w-4 h-4 mr-2" />
+            Exportar CSV
           </button>
         </div>
       </div>
+      
+      {/* Indicador do período selecionado */}
+      {getDateRange && (
+        <div className="text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg inline-block">
+          Mostrando dados de {format(getDateRange.start, "dd/MM/yyyy", { locale: ptBR })} 
+          {' '}até {format(getDateRange.end, "dd/MM/yyyy", { locale: ptBR })}
+          {' '}({getFilteredTransactions().length} transações)
+        </div>
+      )}
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -257,25 +369,68 @@ const Dashboard = ({ transactions, categories, accounts, user }) => {
 
         {/* Gastos por Categoria */}
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-lg font-bold mb-4">Gastos por Categoria</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold">Gastos por Categoria</h2>
+            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setChartType('pie')}
+                className={`px-3 py-1 rounded text-sm ${
+                  chartType === 'pie' ? 'bg-white shadow' : 'text-gray-600'
+                }`}
               >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
-            </PieChart>
+                Pizza
+              </button>
+              <button
+                onClick={() => setChartType('bar')}
+                className={`px-3 py-1 rounded text-sm ${
+                  chartType === 'bar' ? 'bg-white shadow' : 'text-gray-600'
+                }`}
+              >
+                Barras
+              </button>
+            </div>
+          </div>
+          
+          <ResponsiveContainer width="100%" height={300}>
+            {chartType === 'pie' ? (
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+              </PieChart>
+            ) : (
+              <BarChart data={categoryData.slice(0, 8)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" tickFormatter={(value) => `R$ ${value.toLocaleString('pt-BR')}`} />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  width={100}
+                  tick={{ fontSize: 12 }}
+                />
+                <Tooltip 
+                  formatter={(value) => [`R$ ${value.toFixed(2)}`, 'Valor']}
+                  labelFormatter={(label) => label}
+                />
+                <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]}>
+                  {categoryData.slice(0, 8).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
