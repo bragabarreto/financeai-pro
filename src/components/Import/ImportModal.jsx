@@ -854,6 +854,35 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setError('');
 
     try {
+      // Create import_history record
+      const { createImportHistory, updateImportHistory } = await import('../../services/supabase');
+      
+      const importHistoryData = {
+        user_id: user.id,
+        file_name: file?.name || (importMode === 'text' ? 'SMS Import' : importMode === 'photo' ? 'Photo Import' : 'Paycheck Import'),
+        file_size: file?.size || 0,
+        total_rows: processResult?.metadata?.totalRows || editingTransactions.length,
+        extracted_transactions: processResult?.metadata?.extractedTransactions || editingTransactions.length,
+        imported_transactions: 0,
+        failed_transactions: 0,
+        status: 'processing',
+        metadata: {
+          import_type: importMode,
+          source: processResult?.metadata?.source || importMode,
+          ai_enhanced: processResult?.metadata?.aiEnhanced || false,
+          history_matches: processResult?.metadata?.historyMatches || 0,
+          card_digit_matches: processResult?.metadata?.cardDigitMatches || 0
+        }
+      };
+      
+      const { data: importHistoryRecord, error: importHistoryError } = await createImportHistory(importHistoryData);
+      
+      if (importHistoryError) {
+        console.error('Failed to create import history:', importHistoryError);
+      }
+      
+      const importId = importHistoryRecord?.[0]?.id;
+      
       // Create category mapping (normalized for robust lookups)
       const categoryMapping = {};
       Object.values(categories).flat().forEach(cat => {
@@ -866,13 +895,34 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       // Use the first account as fallback (not used since we validate above)
       const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
 
+      // Add import_id to metadata for each transaction
+      const transactionsWithImportId = selectedTransactions.map(t => ({
+        ...t,
+        metadata: {
+          ...(t.metadata || {}),
+          import_id: importId
+        }
+      }));
+
       const result = await importTransactions(
-        // Ensure we rely on categoryId primarily to avoid name variance
-        selectedTransactions.map(t => ({ ...t })),
+        transactionsWithImportId,
         user.id,
         fallbackAccountId,
         categoryMapping
       );
+
+      // Update import_history with results
+      if (importId) {
+        await updateImportHistory(importId, {
+          imported_transactions: result.imported || 0,
+          failed_transactions: result.failed || 0,
+          status: result.failed > 0 ? 'partial' : 'completed',
+          metadata: {
+            ...importHistoryData.metadata,
+            errors: result.errors || []
+          }
+        });
+      }
 
       setImportResult(result);
       setStep(3);
