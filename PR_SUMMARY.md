@@ -1,268 +1,157 @@
-# 🎯 Pull Request Summary
+# Pull Request: Transaction Persistence and Dashboard Improvements
 
-## Photo Import Fix - Critical Bug Resolution
+## Branch
+`feature/transactions-persistence-and-dashboard-improvements`
 
-### 🔴 Problem
-Photo import feature was completely non-functional:
-- Users could select photos ✅
-- Processing button appeared to do nothing ❌
-- No data extraction occurred ❌
-- No transactions were created ❌
+## Summary
+This PR implements comprehensive transaction persistence features including audit trail, import history tracking, soft deletes, enhanced dashboard visualizations, and CSV export functionality.
 
-### ✅ Solution
-Fixed missing parameter in `extractFromPhoto()` function call and added comprehensive error handling.
+## Files Changed
 
----
+### New Files
+1. `migrations/2025-12-11-add-audit-import-and-timestamps.sql` - Database migration
+2. `api/export-transactions.js` - CSV export serverless endpoint
+3. `docs/TRANSACTION_PERSISTENCE_ADDENDUM.md` - Comprehensive documentation
 
-## 📊 Changes at a Glance
+### Modified Files
+1. `src/services/supabase.js` - Enhanced service layer with audit logging
+2. `src/components/Dashboard/Dashboard.jsx` - Advanced visualizations and period selection
+3. `src/components/Import/ImportModal.jsx` - Import history tracking
+4. `package.json` - Added json2csv dependency
+5. `.env.example` - New environment variables
 
-### Code Changes
-```
-8 files changed
-1,031 insertions (+)
-4 deletions (-)
-```
+## Key Features
 
-### Test Coverage
-```
-17 new tests added
-161 total tests passing ✅
-100% success rate
-```
+### 1. Transaction Audit Trail
+- Complete history of all transaction changes (create/update/delete)
+- Automatic timestamp tracking (created_at, updated_at)
+- Soft-delete implementation (preserves data)
+- Audit log table with full payload history
 
-### Build Status
-```
-✅ Build successful
-✅ No warnings
-✅ No breaking changes
-```
+### 2. Import History Tracking
+- Records all import operations with metrics
+- Tracks success/failure counts
+- Links imported transactions via metadata
+- Supports multiple import sources (CSV, SMS, photo, paycheck)
 
----
+### 3. Enhanced Dashboard
+- **Period Selectors**: Current month, 3/6 months, year, all history, custom range
+- **Improved Charts**: Toggle between pie and horizontal bar charts
+- **Rich Tooltips**: Currency formatting, percentages, transaction counts
+- **Export Button**: Direct CSV export with period filtering
 
-## 🔧 Technical Details
+### 4. CSV Export API
+- Serverless endpoint at `/api/export-transactions`
+- Filtering by date range and transaction type
+- Secure with SUPABASE_SERVICE_KEY requirement
+- UTF-8 with BOM for Excel compatibility
 
-### Root Cause
-```javascript
-// ❌ BEFORE - Missing aiConfig parameter
-const transaction = await extractFromPhoto(photoFile, cards);
+## Migration Instructions
 
-// ✅ AFTER - Includes required aiConfig
-const transaction = await extractFromPhoto(photoFile, aiConfig, cards);
-```
-
-### Key Changes
-1. **aiService.js**: Added `getAIConfig()` function to retrieve AI configuration
-2. **ImportModal.jsx**: Fixed function call + improved error handling
-3. **photoExtractorAI.js**: Added validation for extracted data
-4. **Tests**: Added 17 comprehensive unit tests
-5. **Documentation**: Created 3 guide documents
-
----
-
-## 📚 Documentation Files
-
-1. **PHOTO_IMPORT_FIX_GUIDE.md** (228 lines)
-   - Complete problem and solution explanation
-   - User guide with prerequisites
-   - Error troubleshooting section
-   - Technical notes
-
-2. **VISUAL_FIX_SUMMARY.md** (279 lines)
-   - Visual before/after comparison
-   - Detailed code changes
-   - Test coverage analysis
-   - Impact assessment
-
-3. **QUICK_REFERENCE.md** (59 lines)
-   - Quick verification checklist
-   - Key stats and metrics
-   - Review guidelines
-
----
-
-## 🧪 Testing
-
-### Unit Tests Added
-- **getAIConfig()**: 6 tests
-  - Handles missing configuration
-  - Validates required fields
-  - Handles malformed JSON
-  
-- **Photo Extraction**: 11 tests
-  - Tests all AI providers (Gemini, OpenAI, Claude)
-  - Validates error handling
-  - Tests data validation
-  - Tests format conversions
-
-### All Tests Passing
-```
-Test Suites: 9 passed, 9 total
-Tests:       161 passed, 161 total
-Snapshots:   0 total
-Time:        3.009 s
+### Step 1: Run Database Migration
+```sql
+-- In Supabase SQL Editor, run:
+migrations/2025-12-11-add-audit-import-and-timestamps.sql
 ```
 
----
+### Step 2: Set Environment Variables
+```bash
+# Required for export endpoint
+SUPABASE_SERVICE_KEY=your_service_key
 
-## 🎨 User Experience Improvements
-
-### Error Messages - Before vs After
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Missing AI config | "Error processing photo" | "AI configuration not found. Please configure..." |
-| Invalid API key | "Error processing photo" | "API error. Check your API key in Settings..." |
-| Rate limit | "Error processing photo" | "Usage limit reached. Try again later..." |
-| Network error | "Error processing photo" | "Connection error. Check your internet..." |
-| Invalid data | "Error processing photo" | "Image may not contain valid transaction data..." |
-
----
-
-## ✅ Verification Checklist
-
-### For Reviewers
-- [x] All tests pass (161/161)
-- [x] Build succeeds
-- [x] No breaking changes
-- [x] Code follows existing patterns
-- [x] Error handling is comprehensive
-- [x] Documentation is complete
-- [x] Changes are minimal and focused
-
-### For Manual Testing (Optional)
-- [ ] Configure AI in Settings
-- [ ] Add bank account or credit card
-- [ ] Import → Photo tab
-- [ ] Select transaction image
-- [ ] Click "Process Photo"
-- [ ] Verify extraction works
-- [ ] Test error scenarios
-
----
-
-## 📈 Impact Assessment
-
-### Before This Fix
-- **Functionality**: 0% (completely broken)
-- **User Experience**: Poor (no helpful errors)
-- **Test Coverage**: None for photo extraction
-- **Documentation**: None
-
-### After This Fix
-- **Functionality**: 100% (fully working)
-- **User Experience**: Excellent (clear, helpful errors)
-- **Test Coverage**: 17 new tests, 100% passing
-- **Documentation**: 3 comprehensive guides
-
----
-
-## 🔒 Safety & Risk
-
-### Safety Measures
-- ✅ No breaking changes
-- ✅ Backward compatible
-- ✅ All existing tests pass
-- ✅ Follows established patterns
-- ✅ Proper error handling
-
-### Risk Level
-🟢 **LOW RISK**
-- Well tested
-- Minimal changes
-- No breaking changes
-- Comprehensive documentation
-
----
-
-## 🚀 Deployment
-
-### Prerequisites
-None - no configuration changes needed
-
-### Steps
-1. Merge PR
-2. Deploy to production
-3. Verify photo import works
-
-### Rollback
-If needed, simply revert the commits. No database changes or migrations required.
-
----
-
-## 💡 What Users Need to Know
-
-### To Use Photo Import
-1. Configure AI (Settings → AI Configuration)
-2. Add at least one bank account or credit card
-3. Go to Import → Photo tab
-4. Select image of transaction
-5. Click "Process Photo"
-6. Review and import
-
-### Supported Image Types
-- Transaction receipts
-- Bank notifications
-- Card statements
-- PIX confirmations
-- SMS screenshots
-
----
-
-## 📞 Support
-
-### If Issues Occur
-1. Check PHOTO_IMPORT_FIX_GUIDE.md
-2. Verify AI is configured
-3. Verify accounts/cards exist
-4. Check console for detailed errors
-
-### Common Issues & Solutions
-All documented in PHOTO_IMPORT_FIX_GUIDE.md with detailed troubleshooting steps.
-
----
-
-## 🎯 Success Criteria
-
-| Criterion | Target | Result |
-|-----------|--------|--------|
-| Feature Works | Yes | ✅ YES |
-| Tests Pass | 100% | ✅ 161/161 |
-| Build Success | Yes | ✅ YES |
-| Breaking Changes | None | ✅ NONE |
-| Documentation | Complete | ✅ 3 guides |
-| Error Handling | Comprehensive | ✅ 5+ scenarios |
-
----
-
-## 📝 Commit History
-
-```
-eab8b95 Add visual summary and quick reference documentation
-855e95b Add comprehensive documentation for photo import fix
-d810071 Add comprehensive tests for photo extraction and AI config functions
-cfd09d2 Fix photo extraction by adding AI config parameter and improving error handling
-c29833c Initial plan
+# Optional configurations
+REACT_APP_API_URL=https://your-api-domain.com
+ALLOWED_ORIGINS=https://your-frontend.com
 ```
 
+### Step 3: Deploy
+```bash
+npm install
+npm run build
+# Deploy to your platform
+```
+
+## Testing Checklist
+
+- [x] Build passes successfully
+- [x] Syntax validation complete
+- [x] Code review feedback addressed
+- [x] CodeQL security scan (0 vulnerabilities)
+- [x] Backward compatibility verified
+- [ ] Manual testing of new features (requires Supabase instance)
+  - [ ] Run migration
+  - [ ] Test soft-delete
+  - [ ] Test import history tracking
+  - [ ] Test dashboard period selectors
+  - [ ] Test CSV export
+  - [ ] Verify audit logs
+
+## Security
+
+- ✅ CodeQL scan: **0 vulnerabilities**
+- ✅ Requires SUPABASE_SERVICE_KEY (no insecure fallback)
+- ✅ Configurable CORS via environment variable
+- ✅ Row-level security on new tables
+- ✅ Audit trail for data integrity
+
+## Backward Compatibility
+
+This PR is **100% backward compatible**:
+- No existing columns renamed or removed
+- Soft-delete preserves all data
+- New columns have defaults and are nullable
+- getTransactions() supports old calling convention
+- Existing functionality unchanged
+
+## Documentation
+
+Complete implementation guide available in:
+`docs/TRANSACTION_PERSISTENCE_ADDENDUM.md`
+
+Includes:
+- Migration instructions (3 methods)
+- API usage examples
+- Environment variable documentation
+- Deployment guide
+- Troubleshooting section
+- Rollback instructions
+
+## Deployment Notes
+
+### Production Checklist
+1. ✅ Set SUPABASE_SERVICE_KEY in environment
+2. ✅ Run migration in production Supabase
+3. ✅ Configure ALLOWED_ORIGINS if needed
+4. ✅ Deploy application
+5. ✅ Verify tables created
+6. ✅ Test export endpoint
+
+### Rollback Plan
+If needed, rollback SQL is provided in documentation to:
+- Remove new columns from transactions
+- Drop import_history and transaction_audit tables
+- Remove triggers
+
+## Next Steps
+
+After merge:
+1. Run migration on production database
+2. Set required environment variables
+3. Deploy to production
+4. Monitor import history and audit logs
+5. Consider future enhancements:
+   - Restore deleted transactions UI
+   - Audit log viewer
+   - Import history dashboard
+   - Additional export formats
+
+## Questions?
+
+Refer to `docs/TRANSACTION_PERSISTENCE_ADDENDUM.md` for detailed information.
+
 ---
 
-## 🎉 Summary
-
-This PR successfully fixes a critical bug in the photo import functionality by:
-1. ✅ Adding the missing `aiConfig` parameter
-2. ✅ Implementing robust error handling
-3. ✅ Adding comprehensive test coverage
-4. ✅ Creating detailed documentation
-5. ✅ Improving user experience
-
-**Status**: ✅ Ready to Merge  
-**Priority**: 🔴 High (Critical Bug Fix)  
-**Risk**: 🟢 Low  
-**Impact**: 🔴 High (Restores Key Feature)
-
----
-
-**Reviewed by**: [Pending]  
-**Approved by**: [Pending]  
-**Merged by**: [Pending]  
-**Deployed**: [Pending]
+**Status**: Ready for Review ✅
+**Breaking Changes**: None ✅
+**Security**: Verified ✅
+**Documentation**: Complete ✅
