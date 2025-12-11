@@ -854,6 +854,32 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
     setError('');
 
     try {
+      // Create import history record
+      const { createImportHistory, updateImportHistory } = await import('../../services/supabase');
+      
+      const importHistoryData = {
+        user_id: user.id,
+        file_name: file?.name || importMode === 'text' ? 'SMS/Text Import' : importMode === 'photo' ? photoFile?.name || 'Photo Import' : paycheckFile?.name || 'Paycheck Import',
+        file_size: file?.size || photoFile?.size || paycheckFile?.size || 0,
+        total_rows: editingTransactions.length,
+        extracted_transactions: selectedTransactions.length,
+        imported_transactions: 0,
+        failed_transactions: 0,
+        status: 'processing',
+        metadata: {
+          import_mode: importMode,
+          source: importMode === 'file' ? 'csv' : importMode
+        }
+      };
+      
+      const { data: importHistoryRecord, error: historyError } = await createImportHistory(importHistoryData);
+      
+      if (historyError) {
+        console.error('Failed to create import history:', historyError);
+      }
+      
+      const importId = importHistoryRecord?.[0]?.id;
+
       // Create category mapping (normalized for robust lookups)
       const categoryMapping = {};
       Object.values(categories).flat().forEach(cat => {
@@ -866,13 +892,37 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
       // Use the first account as fallback (not used since we validate above)
       const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
 
+      // Add import_id to transaction metadata
+      const transactionsWithImportId = selectedTransactions.map(t => ({
+        ...t,
+        metadata: {
+          ...(t.metadata || {}),
+          import_id: importId,
+          import_source: importMode,
+          import_date: new Date().toISOString()
+        }
+      }));
+
       const result = await importTransactions(
         // Ensure we rely on categoryId primarily to avoid name variance
-        selectedTransactions.map(t => ({ ...t })),
+        transactionsWithImportId,
         user.id,
         fallbackAccountId,
         categoryMapping
       );
+
+      // Update import history with results
+      if (importId) {
+        await updateImportHistory(importId, {
+          imported_transactions: result.imported?.length || 0,
+          failed_transactions: result.failed?.length || 0,
+          status: result.failed?.length > 0 ? 'partial' : 'completed',
+          metadata: {
+            ...importHistoryData.metadata,
+            errors: result.failed?.map(f => f.error) || []
+          }
+        });
+      }
 
       setImportResult(result);
       setStep(3);
