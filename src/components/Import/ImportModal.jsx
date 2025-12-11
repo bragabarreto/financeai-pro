@@ -6,6 +6,7 @@ import {
   History, CreditCard
 } from 'lucide-react';
 import { processImportFile, importTransactions } from '../../services/import/importService';
+import { createImportRecord } from '../../services/supabase';
 import { formatDateLocal, formatBrazilianDate } from '../../utils/dateUtils';
 import { extractMultipleFromText, validateSMSExtraction, calculateSMSConfidence } from '../../services/import/smsExtractor';
 import { isAIAvailable, enhanceTransactionsWithAI, getAIStatus, getAIConfig } from '../../services/import/aiService';
@@ -873,6 +874,32 @@ const ImportModal = ({ show, onClose, user, accounts, categories, cards = [] }) 
         fallbackAccountId,
         categoryMapping
       );
+
+      // Log import to history
+      try {
+        const importType = importMode === 'file' ? (file?.name.endsWith('.csv') ? 'csv' : 'xlsx') : 
+                          importMode === 'text' ? 'sms' : 
+                          importMode === 'photo' ? 'photo' : 'manual';
+        
+        await createImportRecord({
+          user_id: user.id,
+          file_name: file?.name || `${importMode}_import_${new Date().toISOString()}`,
+          file_type: importType,
+          records_imported: result.success || 0,
+          records_failed: result.failed || 0,
+          status: result.failed === 0 ? 'success' : (result.success > 0 ? 'partial' : 'failed'),
+          error_details: result.errors || null,
+          metadata: {
+            import_mode: importMode,
+            total_selected: selectedTransactions.length,
+            ai_enhanced: useAI,
+            categories_mapped: Object.keys(categoryMapping).length
+          }
+        });
+      } catch (logError) {
+        console.error('Failed to log import:', logError);
+        // Don't fail the import if logging fails
+      }
 
       setImportResult(result);
       setStep(3);
