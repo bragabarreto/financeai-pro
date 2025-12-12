@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Script para configurar variáveis de ambiente no Vercel
+# Projeto: financeai-pro
+
+echo "🚀 Configurando variáveis de ambiente no Vercel..."
+echo ""
+
+PROJECT_ID="prj_6ARcM7ucLP1wsapgWfsvxIJUpZye"
+TEAM_ID="team_2WKWoTdUV98pvXKyRkeKSDxw"
+
+# Variáveis do Supabase
+SUPABASE_URL="https://ubyvdvtlyhrmvplroiqf.supabase.co"
+SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVieXZkdnRseWhybXZwbHJvaXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk0MjgxMzcsImV4cCI6MjA3NTAwNDEzN30.dgPykHdUGxe99FnImqphLnT-xV5VNwgnPZzmxhYw3dQ"
+SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVieXZkdnRseWhybXZwbHJvaXFmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTQyODEzNywiZXhwIjoyMDc1MDA0MTM3fQ._wDxY3fDMXOTy0VTsDvuuLpygmN_mlWH228FmDuHl_8"
+
+echo "📋 Variáveis a serem configuradas:"
+echo "  - REACT_APP_SUPABASE_URL"
+echo "  - REACT_APP_SUPABASE_ANON_KEY"
+echo "  - SUPABASE_URL"
+echo "  - SUPABASE_KEY"
+echo "  - SUPABASE_SERVICE_ROLE_KEY"
+echo ""
+
+echo "⚠️  IMPORTANTE: Configure manualmente no Vercel Dashboard"
+echo "🔗 https://vercel.com/dashboard"
+echo ""
+echo "Navegue até:"
+echo "  1. Selecione o projeto 'financeai-pro'"
+echo "  2. Settings → Environment Variables"
+echo "  3. Adicione as seguintes variáveis para TODOS os ambientes (Production, Preview, Development):"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Nome: REACT_APP_SUPABASE_URL"
+echo "Valor: $SUPABASE_URL"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Nome: REACT_APP_SUPABASE_ANON_KEY"
+echo "Valor: $SUPABASE_ANON_KEY"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Nome: SUPABASE_URL"
+echo "Valor: $SUPABASE_URL"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Nome: SUPABASE_KEY"
+echo "Valor: $SUPABASE_ANON_KEY"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Nome: SUPABASE_SERVICE_ROLE_KEY"
+echo "Valor: $SUPABASE_SERVICE_ROLE_KEY"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "✅ Após adicionar as variáveis, faça um Redeploy do projeto!"
+echo ""
